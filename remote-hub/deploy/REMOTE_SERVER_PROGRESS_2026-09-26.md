@@ -78,3 +78,18 @@
 - Mac `en0` 为 `192.168.4.3/24`，与 CAM 静态 `.2` 无地址冲突；`ifconfig` 显示 `status: active`，到主板的路由走 `en0`，用户确认菜单栏连接 CareRover。`networksetup -getairportnetwork en0` 却返回“not associated”，与同一时段的实际 HTTP/ping/网卡状态冲突，暂不据此判定断线。iPad 此刻未连接小车 Wi-Fi。已请求对 CAM `/stream` 做连接/首字节分解计时，并尝试同步串口指标。
 - Mac 单次直连 CAM `/stream` 8 秒测试：TCP 连接耗时约 4.804 秒、未收到 HTTP 首字节，0 字节后超时。服务器经现有 SSH 隧道的单次 `/stream` 测试：本机反向监听连接立即完成，约 4.18 秒收到首字节，8 秒内仅收到 36,931 字节，HTTP 200。两次测试可能时间相邻且 CAM 仅允许一个观看者，不能用其绝对吞吐直接比较，但均证明当前视频链路严重退化。
 - CAM 串口监听期间识别任务继续运行；视频 JPEG 总数由 527 变为 529，随后一段监听内不再增长，说明仅偶发视频帧通过。下一步检查 Mac 的 CAM ARP 条目、无线信号及距离；不先修改识别/编码参数。
+
+## 2026-09-26 本地无线故障进一步定位
+
+- Mac 的 ARP 表中主板 `.1` 与 CAM `.2` 都有 MAC 地址；Mac 与小车距离很近、无遮挡。Mac `en0` 为 `.3`，因此未见直接 IP 冲突或单纯距离问题。
+- 经反向隧道的同一条短测：主板首页 HTTP 302 首字节 5.39 秒；CAM 根路径 HTTP 404 首字节 4.62 秒；CAM `/stream` 6 秒 0 字节。结合之前 Mac 直连主板首页约 4 秒、CAM 根路径约 2.45 秒，慢点已经出现在 Mac↔小车本地链路/板端处理，不是公网/Tailscale 独有，也不是仅视频编码路径。
+- 用户报告电脑直连主板热点时网页和视频仍卡；尚待确认是 Mac 还是另一台电脑。当前 Windows `netsh wlan show interfaces` 显示它连接 `Tsinghua-Secure` 5 GHz，并非小车 AP，本轮未主动切换 Windows 网络，也不能把 Windows 的当前连接当成本地对照。
+- 源码主板在通知功能已配置时执行 `WiFi.mode(WIFI_AP_STA)`，并以 `WiFi.softAP(..., channel=1, ..., max_connection=4)` 启动 AP；同时 `serverchanBegin()` 会让 STA 连接独立热点。Espressif ESP32-S3 文档确认 AP+STA 的 home channel 相同，外部热点的 STA channel 优先，AP 会随之迁移信道（[官方文档](https://docs.espressif.com/projects/esp-idf/en/v4.4.2/esp32s3/api-guides/wifi.html)）。这是待测假设，不应仅凭源码断言它造成当前卡顿。
+- 下一步先用 iPad 直接连小车作跨客户端对照，并读取 Mac 当前关联 CareRover 的 RSSI/信道；若两客户端都慢，再做 AP+STA/热点状态与重启前后单变量 A/B。先不刷固件、不修改 Wi-Fi 配置、不启用远程运动/音频。
+- 用户补充 Mac 与 iPad 直连小车网页/视频都很卡。Mac `wdutil`：RSSI `-52 dBm`、噪声 `-96 dBm`、关联速率 `72 Mbps`、当前 AP 信道 `2g1/20`；信号与距离不足以直接解释数秒级 HTTP 慢响应。历史实测同一 AP+STA 通知配置下 iPad 视频约 6 FPS 且推送时无明显变慢（见 `docs/windows-progress.md` 2026-09-26 条目），故 AP+STA 是待验因素，不是已证实根因。
+- 用户确认网页 IDLE、舵机和功放 5 V 断开、四轮架空，主板与 CAM 均仅由电脑 USB 供电。只按主板 RST 一次后，iPad 网页可显示且频繁断连改善，但视频仍空白。CAM 未重启、未刷写。
+- 空白视频期间 CAM 串口 `jpeg_fps≈5.7–5.8`、`stream_fps=0–0.44`、`video_capture_failures=0`、`wifi=true`，表明摄像头采集/JPEG 编码在工作，帧发送严重滞后。主板重启导致 Mac 反向 SSH 隧道至少 CAM 端口监听消失，服务器 `18082` 拒绝连接；该服务器测量不能用于评价重启后的本地视频。
+- 用户关闭 iPad/Mac 全部小车网页并等待后，CAM `jpeg_fps` 立即回到 0、`jpeg_total` 保持 797，不支持“旧观看者永久占用”的假设。下一步只由 Mac 单客户端直接请求 CAM `/stream` 做重启后的传输复测，避免双观看者干扰。
+- Mac 暂不在用户手边，改由 iPhone 直连视频。初次手机回复后串口 50 秒 `jpeg_fps=0`，经核对手机直开 CAM URL 实际显示“无法打开”，不能把先前屏幕静止图像当作持续实时流。该 iPhone 与原先给主板提供外部联网热点的 iPhone16 是同一部，故当前连接小车观看时网络拓扑已与此前工作状态不同。
+- 用户只断开 CAM USB 5 秒并重新插回，主板未重启；COM3 恢复，CAM `jpeg_total=0`、识别任务和 `wifi=true` 正常、启动后 `min_heap≈32 KB`（重启前约 24.7 KB）。CAM 单独重启后，手机直连 `/stream` 时 `jpeg_fps≈5–6`、`stream_fps≈0–1`，数秒后编码停止并再次重试；断电重启未恢复持续视频，弱化“CAM 旧会话/暂态死锁”假设。
+- 已请用户恢复原网络角色：iPhone16 只提供外部热点、iPad 接入小车 AP 观看，不动 Windows 网络，再测网页观感与 CAM 编码/发送指标。当前不应因为手机同时兼作热点来源和小车观看端的混合实验下定论；若恢复原拓扑仍差，继续查 CAM↔主板 AP 的无线质量/射频布局与 HTTP 发送背压。
