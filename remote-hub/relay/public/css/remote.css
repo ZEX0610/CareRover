@@ -1,0 +1,17 @@
+.remote-call {
+  grid-column: 1 / -1;
+  padding: 18px 22px;
+  border: 1px solid #343b44;
+  border-radius: 18px;
+  background: #191c21;
+}
+.remote-call h2 { margin: 0 0 8px; font-size: 1.1rem; }
+.remote-call p { margin: 0 0 12px; color: #a9b2bd; }
+.remote-call iframe {
+  display: block;
+  width: 100%;
+  min-height: 265px;
+  border: 0;
+  border-radius: 12px;
+  background: #11151a;
+}

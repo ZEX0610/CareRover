@@ -1,0 +1,21 @@
+menu "CareRover CAM"
+config CAREROVER_TUNING_PROFILE
+    int "Tuning profile: 0 safe, 1 balanced, 2 diagnostic"
+    range 0 2
+    default 0
+config CAREROVER_FACE
+    bool "Enable face detection"
+    default y
+config CAREROVER_VIDEO
+    bool "Enable wireless MJPEG"
+    default y
+config CAREROVER_PICO_FACE
+    bool "Use Pico 224 instead of MSR/MNP"
+    default n
+config CAREROVER_WIFI_SSID
+    string "Main controller AP SSID"
+    default "CareRover-XXXX"
+config CAREROVER_WIFI_PASSWORD
+    string "Main controller AP password"
+    default "COMPILE_CHECK_ONLY"
+endmenu

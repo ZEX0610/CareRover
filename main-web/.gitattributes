@@ -1,0 +1,8 @@
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bin binary
+*.png binary
+
+# Preserve received archive bytes so MANIFEST.sha256 survives every checkout.
+CareRover_Demo_Signal_Optimization_Handoff_2026-09-15_clean(1)/** -text -whitespace
+CareRover_Demo_Signal_Optimization_Handoff_2026-09-15_clean.zip.sha256 -text -whitespace

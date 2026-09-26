@@ -1,0 +1,11 @@
+{
+  "verification": "pending_windows_baseline",
+  "fqbn": null,
+  "core_version": null,
+  "sensor_library_version": null,
+  "flash_mode": "dio",
+  "flash_freq": "80m",
+  "flash_size": "16MB",
+  "wl_sector_size": 4096,
+  "notes": "Fill exact Windows baseline FQBN including Flash/PSRAM/USB options and library versions; verify original baseline compiles before setting verification to windows_baseline_confirmed."
+}

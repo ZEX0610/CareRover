@@ -1,0 +1,71 @@
+{
+  "type": "telemetry",
+  "ts": 1788940000000,
+  "connection": {
+    "camera": true,
+    "main_mcu": true
+  },
+  "robot": {
+    "mode": "PERSON_FOLLOW",
+    "state": "TRACKING",
+    "estop": false,
+    "battery_pct": 87,
+    "vx": 0.12,
+    "vy": 0,
+    "wz": -0.06,
+    "control_allowed": true,
+    "motion_output_installed": true,
+    "calibration_ready": true
+  },
+  "video": {
+    "stream_url": "http://192.168.4.2/stream",
+    "source_width": 320,
+    "source_height": 240,
+    "protocol": "mjpeg"
+  },
+  "imu": {
+    "yaw_deg": 1.2,
+    "pitch_deg": 0.1,
+    "roll_deg": -0.2,
+    "valid": true,
+    "calibrated": true,
+    "tilt_fault": false
+  },
+  "vision": {
+    "image_width": 320,
+    "image_height": 240,
+    "ai_fps": 5.8,
+    "person": {
+      "found": true,
+      "x": 124,
+      "y": 32,
+      "w": 76,
+      "h": 176,
+      "confidence": 0.94,
+      "seq": 42,
+      "age_ms": 0
+    },
+    "gesture": {
+      "label": "PALM",
+      "confidence": 0.91,
+      "stable": true
+    }
+  },
+  "health": {
+    "hr_bpm": 74,
+    "spo2_pct": 98,
+    "sqi": 0.94,
+    "finger_detected": true,
+    "state": "VALID"
+  },
+  "device": {
+    "backend": "tracking",
+    "integration": "follow",
+    "supported_modes": [
+      "IDLE",
+      "MANUAL",
+      "PERSON_FOLLOW",
+      "HEALTH_CHECK"
+    ]
+  }
+}

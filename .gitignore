@@ -1,0 +1,23 @@
+# Private review source only; never commit credentials, dumps or build outputs.
+**/.venv/
+**/node_modules/
+**/build/
+**/__pycache__/
+**/*.pyc
+**/*.exe
+**/*.log
+**/.access/
+**/.npm-cache/
+**/.env
+**/.env.*
+!**/.env.example
+**/*.key
+**/*.pem
+**/wifi_secrets.h
+**/watch_secrets.h
+**/audio_config.local.h
+**/*.bin
+**/*.elf
+**/*.map
+**/*.zip
+

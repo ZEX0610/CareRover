@@ -1,0 +1,2 @@
+construct==2.10.70
+esptool==5.1.0

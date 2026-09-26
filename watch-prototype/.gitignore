@@ -1,0 +1,4 @@
+build/
+tests/*.exe
+firmware/CareRoverWatch/watch_secrets.h
+

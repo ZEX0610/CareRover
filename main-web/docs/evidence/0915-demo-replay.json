@@ -1,0 +1,198 @@
+{
+  "profile": "DEMO_BALANCED",
+  "scope": "Offline C++ replay; no device access",
+  "reports": [
+    {
+      "file": "final-health-raw-finger-30s.jsonl",
+      "sha256": "45cd529cea2bef51b3b5a11d479f339e039b8e0d5f352fc4080940432a74b135",
+      "unparseable_text_records": 0,
+      "gesture_frames": 128,
+      "display_accepted": 0,
+      "actions": {
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0
+      },
+      "raw_windows": 47,
+      "raw_hr_values": [
+        91,
+        90,
+        88,
+        87,
+        85,
+        84,
+        83,
+        82,
+        81,
+        79,
+        78,
+        77,
+        76,
+        75,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        86,
+        87,
+        87,
+        87,
+        87
+      ],
+      "raw_first_hr_ms": 14350,
+      "health_candidate_replay_hr_valid": 30,
+      "person_frames": 127,
+      "person_found": 0,
+      "person_limit": "Packaged person summaries omit bbox; timing/count evidence only, not bbox or physical motion validation."
+    },
+    {
+      "file": "final-motion-action-guard-static-60s.jsonl",
+      "sha256": "12b2a350b663a2e96abb3efd450a183905b2267035d4f23de50c2c5fb7e580c5",
+      "unparseable_text_records": 0,
+      "gesture_frames": 229,
+      "display_accepted": 0,
+      "actions": {
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0
+      },
+      "raw_windows": 0,
+      "raw_hr_values": [],
+      "raw_first_hr_ms": null,
+      "health_candidate_replay_hr_valid": 0,
+      "person_frames": 229,
+      "person_found": 0,
+      "person_limit": "Packaged person summaries omit bbox; timing/count evidence only, not bbox or physical motion validation."
+    },
+    {
+      "file": "like-follow-online-sequence-servo-off-40s.jsonl",
+      "sha256": "6e8f1f42ed6c0c7a21c5ed98874d5042e5ed27f71aa573d42738033523d1b6d4",
+      "unparseable_text_records": 0,
+      "gesture_frames": 114,
+      "display_accepted": 54,
+      "actions": {
+        "1": 3,
+        "2": 0,
+        "3": 0,
+        "4": 0
+      },
+      "raw_windows": 0,
+      "raw_hr_values": [],
+      "raw_first_hr_ms": null,
+      "health_candidate_replay_hr_valid": 0,
+      "person_frames": 114,
+      "person_found": 114,
+      "person_limit": "Packaged person summaries omit bbox; timing/count evidence only, not bbox or physical motion validation."
+    },
+    {
+      "file": "post-health-hold-fix-contact-check-8s.jsonl",
+      "sha256": "9383c06e1eab6a96e8ca7fc47886782ed2f4e33c05156c7e0a57719120b2b647",
+      "unparseable_text_records": 0,
+      "gesture_frames": 21,
+      "display_accepted": 5,
+      "actions": {
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0
+      },
+      "raw_windows": 0,
+      "raw_hr_values": [],
+      "raw_first_hr_ms": null,
+      "health_candidate_replay_hr_valid": 0,
+      "person_frames": 22,
+      "person_found": 0,
+      "person_limit": "Packaged person summaries omit bbox; timing/count evidence only, not bbox or physical motion validation."
+    },
+    {
+      "file": "post-health-hold-fix-finger-valid-60s.jsonl",
+      "sha256": "ec304230989d7c025c097e7b44bfc89aea45c928f7d85c435b7879a99a813830",
+      "unparseable_text_records": 1,
+      "gesture_frames": 160,
+      "display_accepted": 0,
+      "actions": {
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0
+      },
+      "raw_windows": 0,
+      "raw_hr_values": [],
+      "raw_first_hr_ms": null,
+      "health_candidate_replay_hr_valid": 43,
+      "person_frames": 161,
+      "person_found": 0,
+      "person_limit": "Packaged person summaries omit bbox; timing/count evidence only, not bbox or physical motion validation."
+    },
+    {
+      "file": "post-like-gate-fix-online-sequence-30s.jsonl",
+      "sha256": "5aa4960a069cf780de97a4c07ad88fbc1b1beecf2fe09ad0c1fa090f9fdceada",
+      "unparseable_text_records": 1,
+      "gesture_frames": 98,
+      "display_accepted": 38,
+      "actions": {
+        "1": 1,
+        "2": 0,
+        "3": 0,
+        "4": 0
+      },
+      "raw_windows": 0,
+      "raw_hr_values": [],
+      "raw_first_hr_ms": null,
+      "health_candidate_replay_hr_valid": 0,
+      "person_frames": 97,
+      "person_found": 94,
+      "person_limit": "Packaged person summaries omit bbox; timing/count evidence only, not bbox or physical motion validation."
+    },
+    {
+      "file": "post-person-miss-fix-boot-15s.jsonl",
+      "sha256": "07f2667076af8cd6f6d6d6f6892a0d233512eb5a34f13a4084c3b96347c6071a",
+      "unparseable_text_records": 0,
+      "gesture_frames": 46,
+      "display_accepted": 0,
+      "actions": {
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0
+      },
+      "raw_windows": 0,
+      "raw_hr_values": [],
+      "raw_first_hr_ms": null,
+      "health_candidate_replay_hr_valid": 0,
+      "person_frames": 46,
+      "person_found": 0,
+      "person_limit": "Packaged person summaries omit bbox; timing/count evidence only, not bbox or physical motion validation."
+    },
+    {
+      "file": "post-ppg-fix-finger-60s.jsonl",
+      "sha256": "a92a9c116579a7e0a7f1bae2d73c4e50a186f12a483e818292d19157ccfe5e6f",
+      "unparseable_text_records": 1,
+      "gesture_frames": 204,
+      "display_accepted": 0,
+      "actions": {
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0
+      },
+      "raw_windows": 0,
+      "raw_hr_values": [],
+      "raw_first_hr_ms": null,
+      "health_candidate_replay_hr_valid": 43,
+      "person_frames": 204,
+      "person_found": 0,
+      "person_limit": "Packaged person summaries omit bbox; timing/count evidence only, not bbox or physical motion validation."
+    }
+  ]
+}

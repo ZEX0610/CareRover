@@ -1,0 +1,11 @@
+{
+  "verification": "compile_only",
+  "fqbn": "esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=disabled",
+  "core_version": "3.3.10",
+  "sensor_library_version": "1.1.2",
+  "flash_mode": "dio",
+  "flash_freq": "80m",
+  "flash_size": "16MB",
+  "wl_sector_size": 4096,
+  "notes": "Compilation probe only. PSRAM disabled is not an assertion about the physical board. Never flash this profile."
+}

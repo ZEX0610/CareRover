@@ -1,0 +1,8 @@
+{
+  "verification":"compile_only",
+  "chip":"esp32s3",
+  "flash_size":"8MB",
+  "psram":"opi",
+  "ssid":"CareRover-XXXX",
+  "password":"COMPILE_CHECK_ONLY"
+}

@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="CareRover 多模态移动健康机器人 · 网页控制台">
+<title>CareRover 控制台</title>
+<link rel="stylesheet" href="css/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='none' stroke='%230A84FF' stroke-width='2.5'/><circle cx='16' cy='16' r='4' fill='%230A84FF'/></svg>">
+</head>
+<body>
+
+<!-- ── 图标精灵表：内联 SVG，避免任何外部请求 ───────────────────────── -->
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-heart" viewBox="0 0 24 24">
+    <path d="M12 20.5C10 18.8 3.5 14.3 3.5 9.4A4.9 4.9 0 0 1 12 6a4.9 4.9 0 0 1 8.5 3.4c0 4.9-6.5 9.4-8.5 11.1Z"/>
+  </symbol>
+  <symbol id="i-lung" viewBox="0 0 24 24">
+    <path d="M12 3v8M12 11c0-1.6-1.3-2.6-2.6-2.6C7.2 8.4 5 10.4 5 14.2c0 3 .6 5.3 1 6.2.3.7 1.1 1 1.8.6l2.6-1.5c1-.6 1.6-1.6 1.6-2.7V11Z"/>
+    <path d="M12 11c0-1.6 1.3-2.6 2.6-2.6 2.2 0 4.4 2 4.4 5.8 0 3-.6 5.3-1 6.2-.3.7-1.1 1-1.8.6l-2.6-1.5c-1-.6-1.6-1.6-1.6-2.7V11Z"/>
+  </symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24">
+    <path d="M2 14h3.2l1.6-5.4L9.6 19l2.2-11 2 8.4 1.5-4.4 1.3 2h5.4"/>
+  </symbol>
+  <symbol id="i-rot-l" viewBox="0 0 24 24">
+    <path d="M4.5 8.5V4M4.5 8.5H9"/>
+    <path d="M4.7 8.6A8 8 0 1 1 4 12.5"/>
+  </symbol>
+  <symbol id="i-rot-r" viewBox="0 0 24 24">
+    <path d="M19.5 8.5V4M19.5 8.5H15"/>
+    <path d="M19.3 8.6A8 8 0 1 0 20 12.5"/>
+  </symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24">
+    <rect x="7" y="7" width="10" height="10" rx="2"/>
+  </symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24">
+    <path d="m9 6 6 6-6 6"/>
+  </symbol>
+</svg>
+
+<main class="app" id="app">
+
+  <!-- ── Header ──────────────────────────────────────────────────────── -->
+  <header class="topbar" id="topbar">
+    <div class="brand">
+      <div class="brand__mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="13"/><circle class="brand__dot" cx="16" cy="16" r="4"/></svg>
+      </div>
+      <div class="brand__text">
+        <h1 class="brand__name">CareRover</h1>
+        <p class="brand__sub" data-i18n="app.subtitle">多模态移动健康机器人 · 控制台</p>
+      </div>
+    </div>
+
+    <div class="topbar__right">
+      <div class="linkstat" id="linkStat" data-state="disconnected">
+        <span class="linkstat__dot" aria-hidden="true"></span>
+        <span class="linkstat__label" id="linkStatLabel" data-i18n="link.disconnected">未连接</span>
+      </div>
+      <dl class="topmetrics">
+        <div class="topmetric"><dt data-i18n="top.latency">延迟</dt><dd id="mLatency">—</dd></div>
+        <div class="topmetric"><dt data-i18n="top.link">链路</dt><dd id="mTransport">MOCK</dd></div>
+      </dl>
+      <button class="ghostbtn" id="langToggle" type="button" title="Switch language" aria-label="Switch language">EN</button>
+    </div>
+  </header>
+
+  <section class="session" aria-label="会话状态">
+    <div><p class="eyebrow">CAREROVER / CONTROL CENTER</p><h2 id="sessionTitle">等待机器人连接</h2><p id="sessionDescription">正在准备控制台。</p></div>
+    <span class="session__edition">PROTOTYPE <b>01</b></span>
+  </section>
+
+  <!-- ── 摄像头 ───────────────────────────────────────────────────────── -->
+  <section class="panel panel--video" aria-labelledby="hCam">
+    <div class="panel__head">
+      <h2 class="panel__title" id="hCam" data-i18n="cam.title">摄像头</h2>
+      <div class="panel__tools">
+        <span class="tag" id="visionStale" hidden data-i18n="cam.stale">视觉数据过期</span>
+        <label class="srcpick">
+          <span class="srcpick__label" data-i18n="cam.source">画面源</span>
+          <select id="videoSourceSel" class="select">
+            <option value="canvas" data-i18n="cam.src.canvas">合成画面</option>
+            <option value="mjpeg" data-i18n="cam.src.mjpeg">MJPEG /stream</option>
+            <option value="file" data-i18n="cam.src.file">本地视频…</option>
+          </select>
+        </label>
+        <input type="file" id="videoFileInput" accept="video/*" hidden>
+        <button class="ghostbtn" id="videoFileOpen" type="button" hidden data-i18n="cam.file.open">打开文件</button>
+      </div>
+    </div>
+
+    <div class="video-stage" id="videoStage">
+      <img id="videoStream" alt="" hidden>
+      <video id="videoFile" playsinline muted loop hidden></video>
+      <canvas id="videoSource"></canvas>
+      <canvas id="videoOverlay"></canvas>
+
+      <div class="video-hud">
+        <div class="video-hud__row">
+          <span class="hudchip hudchip--scene" id="sceneLabel">模拟视野</span><span class="hudchip" id="hudRes">— × —</span>
+          <span class="hudchip" id="hudFps">AI — FPS</span>
+        </div>
+        <div class="video-hud__spacer"></div>
+        <div class="video-hud__row video-hud__row--bottom">
+          <div class="gesture-result"><span class="gesture-result__label" data-i18n="cam.gesture">手势识别</span><span class="hudchip hudchip--gesture" id="hudGesture">无手势</span><span id="gestureDetail">—</span></div>
+        </div>
+      </div>
+
+      <div class="video-error" id="videoError" hidden data-i18n="cam.unavailable">正在等待视频信号</div>
+      <div class="video-corners" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    </div>
+  </section>
+
+  <!-- ── 机器人状态 ────────────────────────────────────────────────────── -->
+  <section class="panel panel--status" aria-labelledby="hRobot">
+    <div class="panel__head">
+      <h2 class="panel__title" id="hRobot" data-i18n="robot.title">机器人状态</h2>
+      <span class="tag tag--warn" id="telemStale" hidden data-i18n="robot.stale">遥测中断</span>
+    </div>
+
+    <div class="statlist">
+      <div class="statrow statrow--hero">
+        <span class="statrow__k" data-i18n="robot.mode">模式</span>
+        <span class="statrow__v statrow__v--hero" id="sMode">—</span>
+      </div>
+      <div class="statrow statrow--hero">
+        <span class="statrow__k" data-i18n="robot.state">状态</span>
+        <span class="statrow__v statrow__v--hero" id="sState">—</span>
+      </div>
+      <div class="hairline"></div>
+      <div class="front-panel">
+        <div class="statrow"><span id="frontTitle">前方障碍距离</span><strong id="frontDistance" class="num">—</strong></div>
+        <p id="frontStatus" role="status" aria-live="polite">未接入</p>
+        <p id="frontPhase">绕障阶段：未执行</p><p id="frontReason"></p>
+        <label class="front-toggle"><input id="demoBypass" type="checkbox" disabled><span id="demoBypassLabel">演示绕障 · 固定向右</span></label>
+        <p id="frontHint" class="front-hint">仅跟随模式；预留右侧及绕行后通道。单探头不探测侧后方。</p>
+      </div>
+      <div class="statrow"><span class="statrow__k">IMU</span><span class="statrow__v" id="sImuStatus">—</span></div>
+      <div class="statrow"><span class="statrow__k" data-i18n="robot.yaw">相对航向 Yaw</span><span class="statrow__v num" id="sYaw">—</span></div>
+      <div class="statrow"><span class="statrow__k" data-i18n="robot.pitchroll">俯仰 / 横滚</span><span class="statrow__v num" id="sPitchRoll">—</span></div>
+      <div class="statrow"><span class="statrow__k" data-i18n="robot.aifps">视觉帧率</span><span class="statrow__v num" id="sAiFps">—</span></div>
+      <div class="hairline"></div>
+      <div class="statrow"><span class="statrow__k" data-i18n="robot.vel">速度指令</span><span class="statrow__v num" id="sVel">—</span></div>
+      <div class="hairline"></div>
+      <div class="statrow">
+        <span class="statrow__k" data-i18n="robot.battery">电池</span>
+        <span class="statrow__v"><span class="battery" id="sBatt"><i class="battery__fill" style="width:0%"></i></span><span class="num" id="sBattPct">—</span></span>
+      </div>
+      <div class="statrow"><span class="statrow__k" data-i18n="robot.linkcam">摄像头链路</span><span class="statrow__v"><span class="dotstat" id="sLinkCam"></span></span></div>
+      <div class="statrow"><span class="statrow__k" data-i18n="robot.linkmcu">主控链路</span><span class="statrow__v"><span class="dotstat" id="sLinkMcu"></span></span></div>
+    </div>
+  </section>
+
+  <!-- ── 健康 ────────────────────────────────────────────────────────── -->
+  <section class="panel panel--health" aria-labelledby="hHealth">
+    <div class="panel__head">
+      <h2 class="panel__title" id="hHealth" data-i18n="health.title">生理监测</h2>
+      <span class="tag" id="healthState">—</span>
+    </div>
+
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric__top"><svg class="ico ico--hr"><use href="#i-heart"/></svg><span data-i18n="health.hr">心率</span></div>
+        <div class="metric__val num" id="mHr">—</div>
+        <div class="metric__unit">BPM</div>
+      </div>
+      <div class="metric">
+        <div class="metric__top"><svg class="ico"><use href="#i-lung"/></svg><span data-i18n="health.spo2">血氧</span></div>
+        <div class="metric__val num" id="mSpo2">—</div>
+        <div class="metric__unit">%SpO₂</div>
+      </div>
+      <div class="metric">
+        <div class="metric__top"><svg class="ico"><use href="#i-wave"/></svg><span data-i18n="health.sqi">信号质量</span></div>
+        <div class="metric__val num" id="mSqi">—</div>
+        <div class="metric__unit">SQI</div>
+      </div>
+    </div>
+
+    <div class="ppg">
+      <canvas id="ppgChart"></canvas>
+      <div class="ppg__meta">
+        <span class="ppg__finger" id="mFinger" data-i18n="health.nofinger">未检测到手指</span>
+        <span class="ppg__scale" id="mPpgRate">— Hz</span>
+      </div>
+    </div>
+
+    <p class="disclaimer" data-i18n="health.disclaimer">原型健康监测功能 — 不可用于医疗诊断</p>
+  </section>
+
+  <!-- ── 控制 ────────────────────────────────────────────────────────── -->
+  <section class="panel panel--control" aria-labelledby="hCtl">
+    <div class="panel__head">
+      <h2 class="panel__title" id="hCtl" data-i18n="ctl.title">运动控制</h2>
+      <span class="tag tag--muted" id="ctlLock" data-i18n="ctl.locked">需切换至手动模式</span>
+    </div>
+
+    <div class="control-body" id="controlBody" data-enabled="false">
+      <div class="joystick" id="joystick" role="application"
+           aria-label="全向平移摇杆" data-i18n-attr="aria-label:ctl.pad" tabindex="0">
+        <svg class="joystick__grid" viewBox="0 0 200 200" aria-hidden="true">
+          <circle class="jg-ring" cx="100" cy="100" r="94"/>
+          <circle class="jg-ring jg-ring--in" cx="100" cy="100" r="62"/>
+          <circle class="jg-ring jg-ring--in" cx="100" cy="100" r="30"/>
+          <path class="jg-cross" d="M100 8v28M100 164v28M8 100h28M164 100h28"/>
+          <path class="jg-dead" d="M0 0"/>
+        </svg>
+        <div class="joystick__knob" id="joystickKnob"></div>
+        <div class="joystick__axis joystick__axis--fwd" data-i18n="ctl.fwd">前</div>
+        <div class="joystick__axis joystick__axis--back" data-i18n="ctl.back">后</div>
+        <div class="joystick__axis joystick__axis--left" data-i18n="ctl.left">左</div>
+        <div class="joystick__axis joystick__axis--right" data-i18n="ctl.right">右</div>
+      </div>
+
+      <div class="control-side">
+        <div class="vec">
+          <div class="vec__item"><span>vx</span><b class="num" id="vVx">+0.00</b></div>
+          <div class="vec__item"><span>vy</span><b class="num" id="vVy">+0.00</b></div>
+          <div class="vec__item"><span>wz</span><b class="num" id="vWz">+0.00</b></div>
+        </div>
+
+        <div class="rotrow">
+          <button class="rotbtn" id="rotL" type="button" data-i18n-attr="aria-label:ctl.rotl" aria-label="左转">
+            <svg class="ico"><use href="#i-rot-l"/></svg><span data-i18n="ctl.rotl">左转</span>
+          </button>
+          <button class="rotbtn rotbtn--stop" id="btnStop" type="button" data-i18n-attr="aria-label:ctl.stop" aria-label="停止">
+            <svg class="ico"><use href="#i-stop"/></svg><span data-i18n="ctl.stop">停止</span>
+          </button>
+          <button class="rotbtn" id="rotR" type="button" data-i18n-attr="aria-label:ctl.rotr" aria-label="右转">
+            <svg class="ico"><use href="#i-rot-r"/></svg><span data-i18n="ctl.rotr">右转</span>
+          </button>
+        </div>
+
+        <label class="speed">
+          <span class="speed__row"><span data-i18n="ctl.speed">速度上限</span><b class="num" id="speedVal">60%</b></span>
+          <input type="range" id="speedScale" min="20" max="100" step="5" value="60">
+        </label>
+
+        <p class="hintkeys" data-i18n="ctl.keys">键盘：W A S D 平移 · Q E 旋转 · 空格停止 · Esc 急停</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 模式 + 急停 ──────────────────────────────────────────────────── -->
+  <section class="dock" aria-label="模式与安全">
+    <div class="modes" id="modeBar" role="group" aria-label="控制模式">
+      <span class="modes__ind" id="modeInd" aria-hidden="true"></span>
+      <button class="modebtn" type="button" data-mode="IDLE"><span data-i18n="mode.IDLE">待机</span></button>
+      <button class="modebtn" type="button" data-mode="MANUAL"><span data-i18n="mode.MANUAL">手动</span></button>
+      <button class="modebtn" type="button" data-mode="PERSON_FOLLOW"><span data-i18n="mode.PERSON_FOLLOW">跟随</span></button>
+      <button class="modebtn" type="button" data-mode="GESTURE_CONTROL"><span data-i18n="mode.GESTURE_CONTROL">手势</span></button>
+      <button class="modebtn" type="button" data-mode="HEALTH_CHECK"><span data-i18n="mode.HEALTH_CHECK">健康</span></button>
+    </div>
+
+    <div class="safety">
+      <button class="estop" id="estopBtn" type="button">
+        <span class="estop__ring" aria-hidden="true"></span>
+        <span class="estop__label" id="estopLabel">紧急停止</span>
+      </button>
+      <button class="clearbtn" id="clearEstopBtn" type="button" hidden data-i18n="safety.clear">解除急停</button>
+    </div>
+  </section>
+
+  <!-- ── 调试 ────────────────────────────────────────────────────────── -->
+  <details class="debug" id="debugPanel">
+    <summary class="debug__summary">
+      <svg class="ico ico--chev"><use href="#i-chevron"/></svg>
+      <span data-i18n="dbg.title">调试与联调</span>
+      <span class="debug__badge" id="dbgBadge">tx 0 · rx 0</span>
+    </summary>
+    <div class="debug__body">
+      <div class="debug__stats" id="dbgStats"></div>
+      <div class="debug__actions">
+        <button class="ghostbtn" id="dbgDrop" type="button" data-i18n="dbg.drop">模拟断线</button>
+        <button class="ghostbtn" id="dbgResume" type="button" hidden data-i18n="dbg.resume">返回实时</button>
+        <button class="ghostbtn" id="dbgRec" type="button" data-i18n="dbg.rec">开始录制</button>
+        <button class="ghostbtn" id="dbgSave" type="button" disabled data-i18n="dbg.save">导出 JSON</button>
+        <button class="ghostbtn" id="dbgReplay" type="button" data-i18n="dbg.replay">回放文件…</button>
+        <button class="ghostbtn" id="dbgClear" type="button" data-i18n="dbg.clear">清空日志</button>
+        <input type="file" id="dbgReplayInput" accept="application/json,.json" hidden>
+      </div>
+      <div class="debug__log" id="dbgLog" role="log" aria-live="off"></div>
+    </div>
+  </details>
+
+  <footer class="foot">
+    <span id="footNote">Mock 模式：无需任何硬件。切换真实硬件仅需替换 /stream 与 /ws 后端。</span>
+    <a class="foot__link" href="docs/protocol.md" data-i18n="foot.proto">通信协议</a>
+  </footer>
+</main>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<dialog class="confirm" id="confirmDlg">
+  <h3 class="confirm__title" id="confirmTitle"></h3>
+  <p class="confirm__msg" id="confirmMsg"></p>
+  <div class="confirm__row">
+    <button class="ghostbtn" id="confirmNo" type="button" data-i18n="dlg.cancel">取消</button>
+    <button class="ghostbtn ghostbtn--danger" id="confirmYes" type="button" data-i18n="dlg.ok">确认</button>
+  </div>
+</dialog>
+
+<noscript><p class="noscript">请启用 JavaScript 以使用控制台。Enable JavaScript to use this console.</p></noscript>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

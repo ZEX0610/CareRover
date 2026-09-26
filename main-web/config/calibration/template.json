@@ -1,0 +1,47 @@
+{
+  "verification": "NOT RUN",
+  "front_direction": "image_top_pending_physical_check",
+  "coordinate_contract": {
+    "vx": "forward",
+    "vy": "right",
+    "wz": "clockwise"
+  },
+  "wheels": [
+    {
+      "id": "FL",
+      "gpio": 10,
+      "neutral_us": null,
+      "invert": null,
+      "span_us": null
+    },
+    {
+      "id": "FR",
+      "gpio": 11,
+      "neutral_us": null,
+      "invert": null,
+      "span_us": null
+    },
+    {
+      "id": "RL",
+      "gpio": 12,
+      "neutral_us": null,
+      "invert": null,
+      "span_us": null
+    },
+    {
+      "id": "RR",
+      "gpio": 13,
+      "neutral_us": null,
+      "invert": null,
+      "span_us": null
+    }
+  ],
+  "imu": {
+    "sda": 6,
+    "scl": 7,
+    "address": "0x68",
+    "bias_dps": null
+  },
+  "operator": null,
+  "tested_at": null
+}

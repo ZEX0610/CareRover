@@ -1,0 +1,10 @@
+{
+  "fatfs_generator": {
+    "version": "esp-idf-v5.5.2",
+    "url": "https://codeload.github.com/espressif/esp-idf/tar.gz/refs/tags/v5.5.2",
+    "sha256": "5db0417d836a6e39eb79ded8c211531df1a10d1f6f7ef75df5cdabaedf467003"
+  },
+  "python_packages": {
+    "construct": "2.10.70"
+  }
+}

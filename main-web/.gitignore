@@ -1,0 +1,31 @@
+.DS_Store
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+node_modules/
+artifacts/
+*.log
+
+# Original local handoff and private build inputs
+/DELIVERY/
+/CareRover_*.txt
+/build/
+/firmware/main_wireless/wifi_secrets.h
+/firmware/main_wireless/build_version.h
+/config/*.local.json
+/output/
+/.playwright-cli/
+/firmware/cam_tracking/sdkconfig
+/firmware/cam_tracking/sdkconfig.old
+/firmware/cam_tracking/managed_components/
+/firmware/cam_tracking/build/
+/firmware/cam_tracking/dependencies.lock
+
+# Physical front-sensor installation/calibration is machine-local.
+firmware/main_wireless/front_config.local.h
+
+# Original local reference bundle (includes restore images); current sources are in firmware/.
+/CareRover_Tracking_Motion_Handoff_2026-09-11/
