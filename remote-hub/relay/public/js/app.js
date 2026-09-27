@@ -258,13 +258,19 @@ async function main() {
   const on = (id, event, fn) => $(id).addEventListener(event, fn, { signal: lifecycle.signal });
   initWorkspace({ beforeViewChange: stop, signal: lifecycle.signal });
   on('sidebarModes', 'click', e => { const button = e.target.closest('[data-mode]'); if (button) changeMode(button.dataset.mode); });
+  const callVideoStage = $('videoStage');
+  const callVideoParent = callVideoStage.parentNode;
+  const callVideoNext = callVideoStage.nextSibling;
   on('callBtn', 'click', () => {
     const dialog = $('remoteCallDialog');
     if (dialog.open) return;
-    dialog.show();
+    dialog.showModal();
+    $('remoteCallVideoSlot').append(callVideoStage);
+    $('connect').focus({ preventScroll: true });
   });
   on('remoteCallClose', 'click', () => $('remoteCallDialog').close());
   $('remoteCallDialog').addEventListener('close', () => {
+    callVideoParent.insertBefore(callVideoStage, callVideoNext);
     window.dispatchEvent(new Event('carerover-call-close'));
   }, { signal: lifecycle.signal });
   on('estopBtn', 'click', emergency); on('clearEstopBtn', 'click', requestClear);

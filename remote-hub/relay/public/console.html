@@ -299,21 +299,19 @@ try { document.documentElement.dataset.theme = localStorage.getItem('carerover.t
 
 <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 
-<dialog class="remote-call-dialog" id="remoteCallDialog" aria-labelledby="remoteCallTitle">
+<dialog class="remote-call-dialog" id="remoteCallDialog" aria-labelledby="remoteCallTitle" data-call-phase="idle" data-speaking="false">
   <div class="remote-call-dialog__head">
-    <div><h2 id="remoteCallTitle">与孩子通话</h2><p>视频仍显示在控制台。建议佩戴耳机，按住说话、松开收听。</p></div>
-    <button id="remoteCallClose" type="button" aria-label="关闭通话">关闭</button>
+    <button class="remote-call-dialog__close" id="remoteCallClose" type="button" aria-label="关闭通话">×</button>
+    <div class="remote-call-dialog__identity"><span class="remote-call-dialog__avatar" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#i-phone"/></svg></span><div><h2 id="remoteCallTitle">与孩子通话</h2><p id="state" role="status">准备接通</p></div></div>
+    <span class="remote-call-dialog__live" aria-hidden="true"><i></i>CareRover</span>
   </div>
-  <div class="remote-call-dialog__body">
-    <label for="token">家长端口令（已登录可留空）</label>
-    <input id="token" type="password" autocomplete="off" placeholder="已登录可留空">
-    <div class="remote-call-dialog__actions">
-      <button id="connect" type="button">连接并允许麦克风</button>
-      <button id="disconnect" type="button" disabled>结束通话</button>
+  <div class="remote-call-dialog__layout">
+    <div class="remote-call-dialog__video" id="remoteCallVideoSlot"></div>
+    <div class="remote-call-dialog__body">
+      <div class="remote-call-dialog__start"><button id="connect" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-phone"/></svg><span>开始通话</span></button><p>接通后即可收听；按住说话，松开继续听。</p></div>
+      <div class="remote-call-dialog__active"><div class="remote-call-dialog__controls"><button id="talk" type="button" disabled aria-label="按住说话，松开收听"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/></svg><span>按住说话</span></button><button id="disconnect" type="button" disabled aria-label="挂断通话"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-phone"/></svg><span>挂断</span></button></div><p class="remote-call-dialog__hint">松开即恢复收听。戴耳机可减少回声。</p></div>
+      <details class="remote-call-dialog__more"><summary>连接选项与通话详情</summary><label for="token">家长口令（已登录可留空）</label><input id="token" type="password" autocomplete="off" placeholder="已登录可留空"><p id="audioStats" aria-live="off">已松开 · 麦克风采集 0 帧 · 已发送 0 帧</p></details>
     </div>
-    <button id="talk" type="button" disabled>按住说话（松开即停止上行）</button>
-    <p id="audioStats" aria-live="polite">已松开 · 麦克风采集 0 帧 · 已发送 0 帧</p>
-    <p id="state" role="status">未连接。请先确认车旁 Windows 网关在线。</p>
   </div>
 </dialog>
 
