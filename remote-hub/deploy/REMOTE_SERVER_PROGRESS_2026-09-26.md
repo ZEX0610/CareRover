@@ -176,3 +176,16 @@
 - 服务器上线前归档旧 UI 到 `/opt/carerover/backups/relay-ui-before-r5-20260927T063159Z.tar`；上传包 SHA-256 `79979A83ACE811A3C4E031A965A55BC731CC0398247C58CE2535450C61F08D51`。`carerover-remote-hub.service` 重启后 active，回环和私有 HTTPS `/health` 返回 HTTP 200。主板 R5 FFat 只写 `0x610000` 并通过 esptool 哈希验证；Windows 使用原保存 Wi-Fi 配置重新连小车，云端恢复 `controlDevice=true/videoFresh=true`。用户尚未回复 R5 的手机视觉和通话弹窗验收结果。
 - 原生 Swift/SwiftUI App 的 Xcode 工程位于另一台 Mac，本轮未取得或改动；仓库新增 `APP_INTEGRATION_START_HERE.md` 和 `remote-hub/docs/IOS_CLIENT_API.md`，描述当前真实接口和限制，不含家长/设备令牌。iPhone App 截图的模拟在线与演示视频不能当作已接入实车。
 - 用户已在小车局域网页与另一台家长设备的私有远程网页分别强制刷新，确认 R5 新布局以及视频、人物框、手势、健康、IMU 均正常更新；异设备通话弹窗和音质仍待单独回复，远程运动未执行。
+
+## 2026-09-27 iPhone182 无声音排查（进行中）
+
+- 用户报告远程 iPhone182 能看视频但听不到小车麦克风。中继 `/health` 多次显示车端 `deviceFrames` 持续增加，而观察时 `audioPaired=false`：问题至少包括家长音频连接未建立，不能把视频登录视为音频登录。
+- 35 ms 本地回归重现：R5 已登录会话 Cookie 请求 `/audio`，原服务返回 403，因为它只接受第二次输入的 `parent.<token>` 子协议。先改为同源已登录 Cookie 可连接音频、旧 token 方式继续可用，匿名/异源仍拒绝；通话页可留空重复口令。云中继 8/8 测试 PASS。上传包 SHA-256 `FF91610AAAC731C5FCB7A48F0F4314EA37426C703BFD0385C6C549C36D8C9C23`，服务器旧三文件备份 `/opt/carerover/backups/relay-before-audio-session-20260927T065945Z.tar`，服务重启后车端控制/视频及音频帧均恢复。正在等待 iPhone182 现场验证 `audioPaired`、接收帧增长和实际听感；若已收帧而仍无声，应转查 Safari AudioContext 与输出设备，不提前宣称修复完成。
+
+## 2026-09-27 iPhone182 独立页 A/B 与 R5 顶层通话
+
+- 用户在 R5 弹窗看到接收帧增长但无声；同一 iPhone182 用 Safari 独立 `/call` 顶层标签收听，能听到小车麦克风。说明车端上行已传达，问题与 R5 嵌套 iframe 的播放上下文有关。独立页按住说话约 5 秒后车端未出声；该次服务器重启前 `parentFrames=0`，尚不能判定车端功放故障。
+- 已将 R5 电话控件直接置于顶层视频页面，不再以 iframe 加载 `/call`；独立 `/call` 保留。红测试旧版失败，新版及全套 relay 9/9 PASS。服务器精确备份五个待替换文件到 `/opt/carerover/backups/relay-before-top-level-call-20260927T071517Z.tar`，上传包 SHA-256 `2106ee38939807a98af8f7bfdbe29a4ab1ad47ee7fe0ce221531df6ddb294a7e`；服务 active，`controlDevice=true/videoFresh=true`，设备音频帧恢复递增。**仍须以 iPhone182 的新版 R5 页面现场确认双向通话**，不能仅凭测试或部署计为完成。
+- iPhone182 的 R5 顶层页面能听到小车，但第一轮按住后车端无声，服务器只计 `parentFrames=22`（约 0.44 秒），与 5 秒按住不符。针对触摸保持加入 `touchstart`/`touchend` 分支和可见的采集/发送帧数，旧版测试红，新版 relay 10/10 绿。精确备份六文件到 `/opt/carerover/backups/relay-before-top-level-call-20260927T072323Z.tar`，上传包 SHA-256 `896ddfc2c31c61c42fe5aa17b73db4fb2cf95cc42e68be664b3cd4cb9bac257f`，服务、视频及车端控制恢复。
+- 第二轮服务器 `parentFrames` 从 0 增至 184、再至 498；车旁 Windows 网关下行转发 `audioDownFrames` 从 273 增至 771。用户确认按住手机说话时小车扬声器有声，松开后手机也能听到小车麦克风。**异设备双向路径已接通**；仍需交替短句音质、回声与视频/遥测并行验收。当前为私有 Tailscale HTTPS，并非公网免登录网页。
+- 用户随后完成约 20 秒的手机与小车交替说话，反馈“两端清楚，视频数据正常”。当前短时异设备半双工远程通话、视频及遥测并行现场通过。未验证长时间运行、掉线重连及远程运动；车旁 Windows 双网络网关需持续开机运行，家长 iPhone182 需加入同一 Tailscale 网络。主板仍为 AP-only 音频应用，微信通知暂停。

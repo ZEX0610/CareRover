@@ -1,9 +1,12 @@
 const $ = (id) => document.getElementById(id);
 let socket, stream, context, source, worklet, mutedSink, receiveGain, limiter, listenGate;
-let speaking = false, sequence = 0, nextPlay = 0, rx = 0, tx = 0, late = 0;
+let speaking = false, sequence = 0, nextPlay = 0, rx = 0, tx = 0, late = 0, captured = 0;
 let mutedUntil = 0;
 let unmuteTimer;
 const state = (message) => { $('state').textContent = message; };
+const updateAudioStats = () => {
+  $('audioStats').textContent = `${speaking ? '按住中' : '已松开'} · 麦克风采集 ${captured} 帧 · 已发送 ${tx} 帧`;
+};
 
 function packet(samples) {
   const out = new ArrayBuffer(648), view = new DataView(out);
@@ -29,6 +32,8 @@ function play(data) {
 
 function setSpeaking(next) {
   speaking = next;
+  if (next) void context?.resume();
+  updateAudioStats();
   mutedUntil = next ? Number.POSITIVE_INFINITY : Date.now() + 700;
   nextPlay = 0;
   clearTimeout(unmuteTimer);
@@ -50,12 +55,13 @@ async function disconnect() {
 
 $('connect').addEventListener('click', async () => {
   const token = $('token').value.trim();
-  if (!token) { state('请先输入家长端口令。'); return; }
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
     state('浏览器麦克风需要 HTTPS 或 localhost；192.168.4.1 的 HTTP 页面无法直接采集。'); return;
   }
   $('connect').disabled = true;
   try {
+    captured = tx = rx = late = 0;
+    updateAudioStats();
     stream = await navigator.mediaDevices.getUserMedia({ audio: {
       channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true
     }, video: false });
@@ -71,22 +77,37 @@ $('connect').addEventListener('click', async () => {
     mutedSink = context.createGain(); mutedSink.gain.value = 0;
     source.connect(worklet).connect(mutedSink).connect(context.destination);
     worklet.port.onmessage = ({ data }) => {
+      captured++;
+      if (speaking || captured % 50 === 0) updateAudioStats();
       if (!speaking || socket?.readyState !== WebSocket.OPEN || socket.bufferedAmount > 65536) return;
       socket.send(packet(new Int16Array(data))); tx++;
+      updateAudioStats();
+      if (tx % 50 === 0) state(`接收 ${rx} 帧，发送 ${tx} 帧。`);
     };
     const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    socket = new WebSocket(`${scheme}//${location.host}/audio`, ['audio-v1', `parent.${token}`]);
+    socket = new WebSocket(`${scheme}//${location.host}/audio`,
+      token ? ['audio-v1', `parent.${token}`] : ['audio-v1']);
     socket.binaryType = 'arraybuffer';
-    socket.onopen = () => { $('disconnect').disabled = false; $('talk').disabled = false; state('通话连接成功，按住说话。'); };
+    socket.onopen = () => { $('disconnect').disabled = false; $('talk').disabled = false; state('通话连接成功，按住说话、松开收听。'); };
     socket.onmessage = ({ data }) => play(data);
     socket.onerror = () => state('连接出错，请核对口令、证书与中继状态。');
     socket.onclose = () => { if (context) disconnect(); };
   } catch (error) { await disconnect(); state(`无法连接或打开麦克风：${error.message}`); }
 });
 $('disconnect').addEventListener('click', disconnect);
+window.addEventListener('carerover-call-close', () => { if (socket || context) disconnect(); });
 const talk = $('talk');
-talk.addEventListener('pointerdown', (event) => { event.preventDefault(); talk.setPointerCapture(event.pointerId); setSpeaking(true); });
+talk.addEventListener('touchstart', (event) => { event.preventDefault(); setSpeaking(true); }, { passive: false });
+for (const event of ['touchend', 'touchcancel']) {
+  document.addEventListener(event, () => { if (speaking) setSpeaking(false); });
+}
+talk.addEventListener('pointerdown', (event) => {
+  if (event.pointerType === 'touch') return;
+  event.preventDefault();
+  setSpeaking(true);
+  try { talk.setPointerCapture?.(event.pointerId); } catch { /* release on window blur */ }
+});
 for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-  talk.addEventListener(event, () => { setSpeaking(false); });
+  talk.addEventListener(event, (pointer) => { if (pointer.pointerType !== 'touch' && speaking) setSpeaking(false); });
 }
 window.addEventListener('blur', () => { setSpeaking(false); });

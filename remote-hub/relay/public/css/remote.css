@@ -1,4 +1,7 @@
 .remote-call-dialog {
+  position: fixed;
+  inset: 72px 16px auto auto;
+  margin: 0;
   width: min(560px, calc(100vw - 24px));
   max-height: calc(100dvh - 24px);
   padding: 20px;
@@ -13,11 +16,14 @@
 .remote-call-dialog h2 { font-size: 1.15rem; }
 .remote-call-dialog p { margin-top: 5px; color: var(--text-2); font-size: .84rem; }
 .remote-call-dialog__head button { padding: 8px 12px; border-radius: 9px; background: var(--surface-2); }
-.remote-call-dialog iframe {
-  display: block;
-  width: 100%;
-  height: min(370px, calc(100dvh - 150px));
-  border: 0;
-  border-radius: 12px;
-  background: var(--surface-sunk);
+.remote-call-dialog__body { display: grid; gap: 10px; }
+.remote-call-dialog__body label { font-size: .84rem; color: var(--text-2); }
+.remote-call-dialog__body input { min-width: 0; width: 100%; padding: 10px; border: 1px solid var(--hair-strong); border-radius: 9px; color: var(--text-1); background: var(--surface-sunk); }
+.remote-call-dialog__body button { padding: 10px 12px; border-radius: 9px; background: var(--surface-2); color: var(--text-1); }
+.remote-call-dialog__body button:disabled { opacity: .45; }
+.remote-call-dialog__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.remote-call-dialog__body #talk { background: #79decd; color: #122420; touch-action: none; }
+.remote-call-dialog__body #state { min-height: 3em; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .remote-call-dialog { inset: auto 12px 12px 12px; width: auto; max-height: min(70dvh, 480px); overflow-y: auto; }
 }

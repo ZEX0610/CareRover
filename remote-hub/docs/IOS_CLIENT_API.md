@@ -13,8 +13,8 @@
 
 1. 在 Safari/WKWebView 中打开上述 HTTPS origin；`GET /` 未登录时 303 到 `/login`。
 2. `POST /login`：表单编码 `token=<家长令牌>`。成功 303 回 `/?transport=ws&video=mjpeg`，响应设置 `cr_session` HttpOnly、Secure、SameSite=Strict、8 小时 Cookie；失败 403。不要尝试用 Tailscale 登录代替此令牌。
-3. `GET /` 返回 R5 远程控制台。`GET /stream` 是需要 Cookie 的 MJPEG；`wss://.../ws` 需要同一 Cookie 与精确的 HTTPS `Origin`。网页顶部电话按钮打开同源 `/call`，浏览器另需家长令牌来建立音频 WS，并须允许麦克风。
-4. 车旁声音实时播放；按住“说话”时发送家长麦克风、松开后收听。现有网页做了 700 ms 半双工抑制和回声处理；家长端宜戴耳机。关闭通话弹窗会卸载 iframe，停止麦克风和音频 WS。
+3. `GET /` 返回 R5 远程控制台。`GET /stream` 是需要 Cookie 的 MJPEG；`wss://.../ws` 需要同一 Cookie 与精确的 HTTPS `Origin`。网页顶部电话按钮在**当前顶层页面**显示通话控件，不再使用 iframe；独立 `GET /call` 仍可用。已登录的浏览器可用同一会话 Cookie 建立音频 WS，无需重复输入家长令牌，并须允许麦克风。旧版 `parent.<令牌>` 子协议仍兼容。
+4. 车旁声音实时播放；按住“说话”时发送家长麦克风、松开后收听。现有网页做了 700 ms 半双工抑制和回声处理；家长端宜戴耳机。关闭 R5 通话控件会停止麦克风和音频 WS。
 
 浏览器安全上下文要求 HTTPS；局域网的 `http://192.168.4.1` 页面不能直接调用浏览器麦克风。局域网 R5 页面顶部电话按钮因此只说明去私有 HTTPS 家长端使用。
 
@@ -28,11 +28,11 @@
 | `/call` | GET HTML | 会话 Cookie；双向通话页面。 |
 | `/stream` | GET `multipart/x-mixed-replace; boundary=frame` | 会话 Cookie；每 part 为 `Content-Type: image/jpeg` + `Content-Length` + JPEG。320×240 源图，远程实际 FPS 以现场网络为准。 |
 | `/ws` | WSS 文本 JSON | 会话 Cookie + 精确 `Origin: https://carerover-relay.tail86bfa5.ts.net`；接收主板遥测、发送控制。当前只允许一位家长控制连接，设备离线时拒绝升级。 |
-| `/audio` | WSS 二进制 | 子协议列表 `audio-v1` 与 `parent.<家长令牌>`，且同样要求精确 `Origin`；家长音频只能一条。它不使用 `/login` Cookie 作认证。 |
+| `/audio` | WSS 二进制 | 已登录家长可用 `cr_session` Cookie + 子协议 `audio-v1` + 精确 `Origin`；也兼容 `audio-v1` 与 `parent.<家长令牌>` 的旧方式。家长音频只能一条。设备仍使用独立 Bearer 令牌。 |
 | `/css/*`, `/js/*`, `/client.js`, `/capture-worklet.js` | GET 静态文件 | 会话 Cookie；给现有网页使用。 |
 | `/device/ws`, `/device/frame` | WS / POST | **设备侧** Bearer 令牌接口。App 不调用、不保存设备令牌。 |
 
-原生 Swift 网络栈不会必然自动带浏览器式 `Origin`。接入 `/ws`、`/audio` 时必须按当前服务器要求设置准确 Origin；HTTP Cookie 也须从 `/login` 响应正确保存并随 `/ws`、`/stream` 发送。这一原生握手路径尚未在实机 App 验收，建议先通过 WebView 验证，然后添加自动化握手测试。服务器不提供通用注册/刷新令牌、REST 运动指令或 WebRTC 信令。
+原生 Swift 网络栈不会必然自动带浏览器式 `Origin`。接入 `/ws`、`/audio` 时必须按当前服务器要求设置准确 Origin；HTTP Cookie 也须从 `/login` 响应正确保存并随 `/ws`、`/audio`、`/stream` 发送。这一原生握手路径尚未在实机 App 验收，建议先通过 WebView 验证，然后添加自动化握手测试。服务器不提供通用注册/刷新令牌、REST 运动指令或 WebRTC 信令。
 
 ## 4. 控制与遥测
 

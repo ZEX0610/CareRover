@@ -179,7 +179,7 @@ export async function makeServer({ deviceToken, parentToken, tlsKey, tlsCert,
     const protocols = (req.headers['sec-websocket-protocol'] ?? '').split(',').map((s) => s.trim());
     const parentCredential = protocols.find((p) => p.startsWith('parent.'))?.slice(7);
     const role = bearer && equalToken(bearer[1], deviceToken) ? 'device' :
-      equalToken(parentCredential, parentToken) ? 'parent' : null;
+      (equalToken(parentCredential, parentToken) || sessionFor(req)) ? 'parent' : null;
     const origin = req.headers.origin;
     const allowedOrigin = proxyOrigin ?? `${localOnly ? 'http' : 'https'}://${req.headers.host}`;
     // Browser connection must be same-origin; the device has no Origin header.

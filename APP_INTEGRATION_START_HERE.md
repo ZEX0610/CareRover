@@ -16,7 +16,7 @@
 
 车旁 ESP32-S3 主板开 `CareRover-EE68` AP；CAM 在 AP 中提供 MJPEG。车旁 Windows 通过 Wi-Fi 连 AP，另由 USB/有线上网，运行 `remote-hub/gateway/start-windows.ps1 -EnableAudio`，将 `/ws`、CAM 视频和 `/audio` 转发到云中继。服务器 `carerover-relay.tail86bfa5.ts.net` 以 Tailscale Serve 提供私有 HTTPS/WSS；家长 Mac/iPhone 须加入 **new20070610** tailnet，使用独立互联网，不连接小车 AP。当前没有 ESP32 直接到云端、没有公网 Funnel、没有云端 AI 对话服务。
 
-本轮 R5 UI 已合并到 `main-web/` 和 `remote-hub/relay/public/`。`main-web` 为 FFat 局域网页源；`remote-hub` 为云端页面源，其电话按钮打开真实 `/call`。源文件合并不自动代表实机 FFat 或云服务器已部署，是否已部署看上述现场进度，不要凭 Git 提交推断。
+本轮 R5 UI 已合并到 `main-web/` 和 `remote-hub/relay/public/`。`main-web` 为 FFat 局域网页源；`remote-hub` 为云端页面源，其电话按钮在顶层页面打开真实通话控件，独立 `/call` 也可用。源文件合并不自动代表实机 FFat 或云服务器已部署，是否已部署看上述现场进度，不要凭 Git 提交推断。
 
 ## App 的最短接入路径
 

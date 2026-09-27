@@ -304,7 +304,17 @@ try { document.documentElement.dataset.theme = localStorage.getItem('carerover.t
     <div><h2 id="remoteCallTitle">与孩子通话</h2><p>视频仍显示在控制台。建议佩戴耳机，按住说话、松开收听。</p></div>
     <button id="remoteCallClose" type="button" aria-label="关闭通话">关闭</button>
   </div>
-  <iframe title="CareRover 双向通话" allow="microphone"></iframe>
+  <div class="remote-call-dialog__body">
+    <label for="token">家长端口令（已登录可留空）</label>
+    <input id="token" type="password" autocomplete="off" placeholder="已登录可留空">
+    <div class="remote-call-dialog__actions">
+      <button id="connect" type="button">连接并允许麦克风</button>
+      <button id="disconnect" type="button" disabled>结束通话</button>
+    </div>
+    <button id="talk" type="button" disabled>按住说话（松开即停止上行）</button>
+    <p id="audioStats" aria-live="polite">已松开 · 麦克风采集 0 帧 · 已发送 0 帧</p>
+    <p id="state" role="status">未连接。请先确认车旁 Windows 网关在线。</p>
+  </div>
 </dialog>
 
 <dialog class="confirm" id="confirmDlg">
@@ -318,5 +328,6 @@ try { document.documentElement.dataset.theme = localStorage.getItem('carerover.t
 
 <noscript><p class="noscript">请启用 JavaScript 以使用控制台。Enable JavaScript to use this console.</p></noscript>
 <script type="module" src="js/app.js"></script>
+<script type="module" src="/client.js"></script>
 </body>
 </html>

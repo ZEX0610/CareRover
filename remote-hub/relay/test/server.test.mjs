@@ -61,6 +61,47 @@ test('wrong credential, foreign Origin and duplicate device are refused', async 
   }
 });
 
+test('logged-in remote parent can receive car audio without entering the token twice', async () => {
+  const app = await makeServer({ localOnly: true, deviceToken, parentToken });
+  const root = `http://127.0.0.1:${app.address.port}`;
+  const url = `${root.replace('http:', 'ws:')}/audio`;
+  let device, parent;
+  try {
+    const login = await fetch(`${root}/login`, { method: 'POST', redirect: 'manual',
+      body: new URLSearchParams({ token: parentToken }) });
+    assert.equal(login.status, 303);
+    const cookie = login.headers.get('set-cookie').split(';')[0];
+    const anonymous = new WebSocket(url, ['audio-v1'], { headers: { Origin: root } });
+    await assert.rejects(once(anonymous, 'open'));
+    const foreign = new WebSocket(url, ['audio-v1'],
+      { headers: { Origin: 'http://other.invalid', Cookie: cookie } });
+    await assert.rejects(once(foreign, 'open'));
+    device = await connect(url, { headers: { Authorization: `Bearer ${deviceToken}` } });
+    parent = await connect(url, { protocols: ['audio-v1'], headers: { Origin: root, Cookie: cookie } });
+    const received = once(parent, 'message');
+    device.send(frame(17));
+    assert.deepEqual((await received)[0], frame(17));
+  } finally {
+    device?.terminate(); parent?.terminate(); await app.close();
+  }
+});
+
+test('R5 call controls run in the top-level video page, not a nested iframe', async () => {
+  const app = await makeServer({ localOnly: true, deviceToken, parentToken });
+  const root = `http://127.0.0.1:${app.address.port}`;
+  try {
+    const login = await fetch(`${root}/login`, { method: 'POST', redirect: 'manual',
+      body: new URLSearchParams({ token: parentToken }) });
+    const cookie = login.headers.get('set-cookie').split(';')[0];
+    const html = await (await fetch(root, { headers: { Cookie: cookie } })).text();
+    assert.match(html, /id="remoteCallDialog"/);
+    assert.match(html, /id="connect"/);
+    assert.match(html, /id="talk"/);
+    assert.match(html, /src="\/client\.js"/);
+    assert.doesNotMatch(html, /<iframe/);
+  } finally { await app.close(); }
+});
+
 test('serves the separate parent page and forwards paced PCM frames locally', async () => {
   const app = await makeServer({ localOnly: true, deviceToken, parentToken });
   const root = `http://127.0.0.1:${app.address.port}`;

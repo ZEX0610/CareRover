@@ -261,13 +261,11 @@ async function main() {
   on('callBtn', 'click', () => {
     const dialog = $('remoteCallDialog');
     if (dialog.open) return;
-    dialog.querySelector('iframe').src = '/call';
-    dialog.showModal();
+    dialog.show();
   });
   on('remoteCallClose', 'click', () => $('remoteCallDialog').close());
   $('remoteCallDialog').addEventListener('close', () => {
-    // Unloading /call closes the microphone track and audio WebSocket.
-    $('remoteCallDialog').querySelector('iframe').removeAttribute('src');
+    window.dispatchEvent(new Event('carerover-call-close'));
   }, { signal: lifecycle.signal });
   on('estopBtn', 'click', emergency); on('clearEstopBtn', 'click', requestClear);
   on('confirmYes', 'click', confirmClear); on('confirmNo', 'click', () => $('confirmDlg').close());
