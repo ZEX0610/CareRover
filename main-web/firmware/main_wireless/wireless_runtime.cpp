@@ -7,6 +7,7 @@
 #include "hcsr04.h"
 #include "seat_notification_gate.h"
 #include "serverchan_notify.h"
+#include "audio_gateway.h"
 #include <Arduino.h>
 #include <WiFi.h>
 #include <FFat.h>
@@ -100,6 +101,9 @@ void failSafe(bool fault, const char* reason) {
 }
 Session* sessionFor(int fd) { for (auto& c : clients) if (c.fd == fd) return &c; return nullptr; }
 void closeSocket(httpd_handle_t, int fd) {
+#if defined(CAREROVER_AUDIO_GATEWAY)
+  audioGatewayClosed(fd);
+#endif
   if (auto* c = sessionFor(fd)) {
     const auto now = wirelessNowMs();
     portENTER_CRITICAL(&safetyMux); safety.disconnect(c->id, now); portEXIT_CRITICAL(&safetyMux);
@@ -262,7 +266,7 @@ const char* mime(const char* path) {
 esp_err_t fileHandler(httpd_req_t* req) {
   if (!strcmp(req->uri,"/")) {
     httpd_resp_set_status(req,"302 Found"); httpd_resp_set_hdr(req,"Location",CAREROVER_INTEGRATION ? "/?transport=ws&video=mjpeg" : "/?transport=ws&video=canvas");
-    httpd_resp_set_hdr(req,"Cache-Control","no-store"); return httpd_resp_send(req,nullptr,0);
+    httpd_resp_set_hdr(req,"Cache-Control","no-store"); httpd_resp_set_hdr(req,"Connection","close"); return httpd_resp_send(req,nullptr,0);
   }
   char path[160]; const size_t length=strcspn(req->uri,"?");
   if(length>=sizeof(path)) return httpd_resp_send_err(req,HTTPD_404_NOT_FOUND,"Not found");
@@ -274,6 +278,7 @@ esp_err_t fileHandler(httpd_req_t* req) {
   auto file=FFat.open(path,"r");
   if(!file || file.isDirectory()) return httpd_resp_send_err(req,HTTPD_404_NOT_FOUND,"Not found");
   httpd_resp_set_type(req,contentType); httpd_resp_set_hdr(req,"Cache-Control","no-store");
+  httpd_resp_set_hdr(req,"Connection","close");
   httpd_resp_set_hdr(req,"X-Content-Type-Options","nosniff");
   char chunk[2048];
   while(file.available()) { const size_t n=file.readBytes(chunk,sizeof(chunk)); if(!n || httpd_resp_send_chunk(req,chunk,n)!=ESP_OK) { file.close(); return ESP_FAIL; } }
@@ -590,7 +595,13 @@ void wirelessBegin() {
   const char* password=CAREROVER_AP_PASSWORD;
   if(strlen(password)<8 || strlen(password)>63 || !strcmp(password,"REPLACE_WITH_PRIVATE_PASSWORD")) { failSafe(true,"invalid_password"); Serial.println("{\"type\":\"wireless_error\",\"code\":\"PRIVATE_PASSWORD_REQUIRED\"}"); return; }
   char ssid[24]; snprintf(ssid,sizeof(ssid),"CareRover-%04X",unsigned(ESP.getEfuseMac()&0xffff));
+  // Diagnostic build only: isolate the rover AP from the external hotspot.
+  // Normal builds retain the existing AP+STA / Serverchan behavior.
+#if defined(CAREROVER_DIAG_AP_ONLY)
+  WiFi.mode(WIFI_AP);
+#else
   WiFi.mode(serverchanConfigured()?WIFI_AP_STA:WIFI_AP);
+#endif
   if(!WiFi.softAPConfig(IPAddress(192,168,4,1),IPAddress(192,168,4,1),IPAddress(255,255,255,0),IPAddress(192,168,4,3)) || !WiFi.softAP(ssid,password,1,0,4)) { failSafe(true,"ap_failed"); return; }
   apOnline.store(true); const auto now=wirelessNowMs();
   portENTER_CRITICAL(&safetyMux); safety.network(true,now); portEXIT_CRITICAL(&safetyMux);
@@ -608,10 +619,24 @@ void wirelessBegin() {
     httpd_uri_t ws{}; ws.uri="/ws"; ws.method=HTTP_GET; ws.handler=wsHandler; ws.is_websocket=true;
     if(httpd_register_uri_handler(server,&ws)!=ESP_OK) { failSafe(true,"ws_failed"); return; }
   }
+#if defined(CAREROVER_AUDIO_GATEWAY)
+  if(audioGatewayBegin(server)) {
+    httpd_uri_t audio{}; audio.uri="/audio"; audio.method=HTTP_GET;
+    audio.handler=audioGatewayHandle; audio.is_websocket=true;
+    if(httpd_register_uri_handler(server,&audio)!=ESP_OK)
+      Serial.println("{\"type\":\"audio_error\",\"code\":\"ROUTE_FAILED\"}");
+  } else {
+    Serial.println("{\"type\":\"audio_error\",\"code\":\"INIT_FAILED\"}");
+  }
+#endif
   httpd_uri_t files{}; files.uri="/*"; files.method=HTTP_GET; files.handler=fileHandler;
   if(httpd_register_uri_handler(server,&files)!=ESP_OK) { failSafe(true,"http_routes_failed"); return; }
   if(CAREROVER_STAGE>=3 && xTaskCreate(publisherTask,"telemetry",3072,nullptr,1,nullptr)!=pdPASS) failSafe(true,"publisher_failed");
+#if !defined(CAREROVER_DIAG_AP_ONLY)
   serverchanBegin();
+#else
+  Serial.println("{\"type\":\"wifi_diagnostic\",\"mode\":\"ap_only\",\"wechat\":\"paused\"}");
+#endif
   wirelessStatus();
 }
 

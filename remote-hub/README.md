@@ -1,19 +1,21 @@
 # CareRover 远程网站与通话阶段包（2026-09-26）
 
-这是**独立试验包**，不是已经烧录的小车整机固件。没有修改 `C:\CareRover`，没有切换电脑网络，也没有让舵机上电。`relay/` 将原网页与已本机验证的音频中继放在同一 HTTPS 站点，并加入家长登录、远程控制 WebSocket 桥和 MJPEG 帧入口。现阶段设备固件**还没有连接这些云端入口**，故不能宣称已能在公网实物通话或远程操控。
+截至 2026-09-27，车旁 Windows 电脑以 iPhone USB 上网、Wi-Fi 连小车，并把主板遥测/控制、CAM MJPEG 和双向 I²S 音频转发到已部署的私有 Tailscale HTTPS 中继。主板临时 AP-only `audio2` 应用已烧录；用户在同一台 Windows 的家长网页实测双向短句可听、视频/人物框/手势/健康/IMU 持续更新。**尚未用另一台独立联网的家长设备做异地验收，也未验收远程运动或长时间稳定性。** 小车舵机保持断电；AP-only 暂停 Server酱微信通知。完整现场证据见 [部署进度](deploy/REMOTE_SERVER_PROGRESS_2026-09-26.md) 和 `../main-web/docs/windows-progress.md`。
+
+以下较早的购买与开发条目保留作阶段历史；以本段及进度记录为当前状态。`C:\CareRover` 原工作树没有被此次音频联调直接改写，当前实机对应源码在本私有快照中。
 
 ## 已完成
 
 - 原控制台已嵌入通话面板；视频仍在原位置显示，`/stream` 为同源 MJPEG，人物框、手势、摇杆和遥测继续沿用现有前端协议。
 - 一台设备、一位家长；独立高熵令牌；家长登录为 8 小时 HttpOnly/SameSite 会话。控制 `/ws`、设备上行 `/device/ws`、音频 `/audio` 分离。单帧 JPEG 走设备鉴权的 `POST /device/frame`。
 - 对音频帧、控制 JSON、JPEG 大小、缓冲和重复设备做边界限制；浏览器同源、TLS 与 CSP 保护；没有录音或录像存盘。
-- 本机 `npm test`：6/6 PASS，其中包括音频双向、TLS/WSS、自检、控制桥和 JPEG 上传。这里的 PASS 不是设备验收。
+- 本机 `relay/npm test`：7/7 PASS、`gateway/npm test`：2/2 PASS；软件测试与实物验收边界分开记录。
 
 ## 尚未完成
 
-1. INMP441/MAX98357/8 Ω 扬声器尚未接线和实物测试。先按[独立音频测试文档](../CareRover_Audio_Lab_2026-09-25/docs/WIRING_AND_TEST.md)在**备用板**验证；不要用音频实验草图覆盖现有主板固件。
-2. 主板没有主动连接 `/device/ws` 的客户端、`/device/frame` 上传任务和与音频实验 I²S 代码的整合；这些需分阶段实测当前约 114 KB 的内部堆余量。CAM 仍仅通过小车内网向主板供图，不能直接访问 iPhone 热点。
-3. 云服务器已完成系统盘点、SSH 公钥加固、Node.js 24 LTS 安装和中继源码上传；服务器端自动测试 6/6 通过。域名/证书、常驻公网服务、音频连线和真实车端并发测试尚未具备。详见[服务器现场进度](deploy/REMOTE_SERVER_PROGRESS_2026-09-26.md)。
+1. 家长端目前只在兼作车旁网关的 Windows 电脑上实测；仍需另一台不连接小车 Wi-Fi、独立联网且加入同一 tailnet 的家长设备验收。手机热点/电脑同处一室时容易形成声学回路，应使用耳机并拉开距离。
+2. 远程摇杆与真车运动、断线停机后的恢复、连续运行、音视频延迟与主板最小堆尚未完成专项现场验收。当前四轮架空、舵机 5 V 断开。
+3. AP-only 是视频卡顿隔离后的临时方案，Server酱通知暂停；恢复微信通知且保持视频性能仍需设计/验证。Windows 网关断电或退出后，远程链路即不可用。
 
 ## 推荐购买配置（1 车 / 1 位家长 / 模型经 API）
 
@@ -29,7 +31,7 @@
 
 若只做音视频中继和 API 调用，不需要 3090/4090。实际 4 核 8 GB 已足够做第一轮单车试验；以后若在服务器本地重编码或跑视觉模型，应重新压测再升级。单路 16 kHz PCM 双向约 0.52 Mbit/s 载荷，视频流和 HTTP/TLS 另计；目前已购买的 25 Mbps 是峰值上限而非持续占用。
 
-## 用户需要完成
+## 2026-09-26 早期用户清单（历史记录，当前不要重复执行）
 
 1. 购买云主机后只告知**公网 IP、系统版本、域名是否可用/已备案**；不要在聊天中粘贴 root 密码、私钥、API Key 或设备/家长令牌。保留登录凭据在自己的密码管理器里。
 2. 推荐准备可解析到该 IP 的域名与受信任 HTTPS 证书。域名不是纯技术上的必需品：Let's Encrypt 在 2026 年已支持公网 IP 证书，但仅约 6 天有效，需可靠自动续期。中国大陆云主机作为公网网站使用时按服务商要求办理备案；仅用 IP 不自动免备案。
@@ -37,7 +39,7 @@
 4. 让车旁的 iPhone 16 热点保持可用；家长远程设备使用自己的互联网连接。若热点手机随家长离开，车就会离线。
 5. 准备实物测试时确认舵机 5 V 断开、车轮架空，然后才进入板级 I²S、整车并发和无 USB 验收。
 
-## 我可以继续完成
+## 2026-09-26 早期开发计划（历史记录）
 
 - 在服务器可登录后部署 Node 中继、域名证书、服务自启和访问控制；用模拟车端测手机 HTTPS 网页、视频显示、人物框/遥测协议和双向音频。
 - 在独立音频实测通过后，将音频采集/播放、控制上行和 JPEG 上传分阶段并入主板固件；先编译和主机模拟，再经确认进行硬件烧录/现场 A/B。
@@ -47,8 +49,8 @@
 
 `cd relay && npm ci && npm test`。测试不需要服务器或小车。真实公网运行至少需要 `AUDIO_DEVICE_TOKEN`、`AUDIO_PARENT_TOKEN`（分别 `openssl rand -hex 32`）、`AUDIO_TLS_KEY`、`AUDIO_TLS_CERT` 和 `PORT`。本机模拟才允许 `AUDIO_INSECURE_LOCALHOST=1`，它只能监听 `127.0.0.1`，不能用于公网。不要提交私有配置。
 
-私有演示路径可改用服务器端 Tailscale Serve：设置 `AUDIO_PROXY_PUBLIC_ORIGIN=https://<服务器的 tailnet 域名>`、`PORT=8088`，不设置 `AUDIO_TLS_KEY`/`AUDIO_TLS_CERT`。中继后端仍只监听 `127.0.0.1`，由 Tailscale Serve 将 tailnet 内的 HTTPS/WSS 转发给它；不要启用 Funnel，也不要把 8088 暴露到公网。Mac 可通过 iPhone USB 上网、Wi-Fi 连接小车 AP，随后作为受限子网路由器让服务器访问小车。现阶段仅完成本机代码和测试，尚未部署或实物验收。
+当前已使用服务器端 Tailscale Serve：`AUDIO_PROXY_PUBLIC_ORIGIN=https://carerover-relay.tail86bfa5.ts.net`、后端只监听 `127.0.0.1:8088`，HTTPS/WSS 只对同一 tailnet 开放，未启用 Funnel。车旁 Windows 运行 `gateway/start-windows.ps1 -EnableAudio`，无需把 ESP32 局域网路由公开到服务器。Windows 系统代理会干扰 tailnet 私有地址；家长浏览器需直连该域名或为其配置代理绕过。
 
-服务启动后，家长在 `/login` 输入家长令牌，默认进入 `/?transport=ws&video=mjpeg`。同一页面下方的通话面板为 `/call`，首次连接还需输入家长令牌并授予麦克风权限。当前登录/通话原型仍需进行真实手机浏览器可用性检查。设备端控制连接 `wss://<domain>/device/ws`，每帧 JPEG 向 `https://<domain>/device/frame` POST；音频设备连接 `/audio`。两路设备连接均用 `Authorization: Bearer <device token>`，实际固件尚未实现。
+家长在 `/login` 输入家长令牌，默认进入 `/?transport=ws&video=mjpeg`；页面下方 `/call` 通话面板首次连接需再次输入令牌并授权浏览器麦克风。Windows 网关负责云端 `/device/ws`、`/device/frame` 和 `/audio`，设备令牌只在网关进程内存中；主板本身提供局域网 `/ws` 和 `/audio`，CAM 提供 `/stream`。独立家长手机/电脑的浏览器兼容性仍待验证。
 
 `deploy/` 提供环境变量模板和 systemd 服务模板。证书私钥应仅供服务账号读取；证书更新后重启服务。部署前还要配置域名解析、防火墙、服务账号和系统更新。**不要**以 `AUDIO_INSECURE_LOCALHOST=1` 对外监听或关闭设备 TLS 证书验证。

@@ -1,5 +1,7 @@
 relay/node_modules/
 relay/.npm-cache/
+gateway/node_modules/
+gateway/.npm-cache/
 *.local
 *.key
 *.pem

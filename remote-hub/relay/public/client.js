@@ -1,6 +1,8 @@
 const $ = (id) => document.getElementById(id);
-let socket, stream, context, source, worklet, mutedSink;
+let socket, stream, context, source, worklet, mutedSink, receiveGain, limiter, listenGate;
 let speaking = false, sequence = 0, nextPlay = 0, rx = 0, tx = 0, late = 0;
+let mutedUntil = 0;
+let unmuteTimer;
 const state = (message) => { $('state').textContent = message; };
 
 function packet(samples) {
@@ -15,19 +17,33 @@ function play(data) {
   if (!(data instanceof ArrayBuffer) || data.byteLength !== 648) return;
   const v = new DataView(data);
   if (v.getUint8(0) !== 67 || v.getUint8(1) !== 82 || v.getUint8(2) !== 1 || v.getUint8(3) !== 1) return;
+  if (speaking || Date.now() < mutedUntil) return;
   const buffer = context.createBuffer(1, 320, 16000), pcm = buffer.getChannelData(0);
   for (let i = 0; i < 320; ++i) pcm[i] = v.getInt16(8 + i * 2, true) / 32768;
-  const node = context.createBufferSource(); node.buffer = buffer; node.connect(context.destination);
+  const node = context.createBufferSource(); node.buffer = buffer; node.connect(receiveGain);
   const minTime = context.currentTime + 0.09;
   if (nextPlay < minTime || nextPlay > minTime + 0.35) { nextPlay = minTime; late++; }
   node.start(nextPlay); nextPlay += .02; rx++;
   if (rx % 50 === 0) state(`接收 ${rx} 帧，发送 ${tx} 帧，播放重同步 ${late} 次。`);
 }
 
+function setSpeaking(next) {
+  speaking = next;
+  mutedUntil = next ? Number.POSITIVE_INFINITY : Date.now() + 700;
+  nextPlay = 0;
+  clearTimeout(unmuteTimer);
+  if (listenGate && context) listenGate.gain.setTargetAtTime(0, context.currentTime, 0.005);
+  if (!next) unmuteTimer = setTimeout(() => {
+    if (listenGate && context && !speaking)
+      listenGate.gain.setTargetAtTime(1, context.currentTime, 0.04);
+  }, 700);
+}
+
 async function disconnect() {
-  speaking = false; socket?.close(); socket = null;
+  setSpeaking(false); socket?.close(); socket = null;
   stream?.getTracks().forEach((track) => track.stop()); stream = null;
-  await context?.close(); context = null;
+  clearTimeout(unmuteTimer);
+  await context?.close(); context = null; receiveGain = limiter = listenGate = null;
   $('connect').disabled = false; $('disconnect').disabled = true; $('talk').disabled = true;
   state('已结束通话，麦克风已关闭。');
 }
@@ -44,6 +60,11 @@ $('connect').addEventListener('click', async () => {
       channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true
     }, video: false });
     context = new AudioContext(); await context.resume();
+    receiveGain = context.createGain(); receiveGain.gain.value = 10;
+    limiter = context.createDynamicsCompressor(); limiter.threshold.value = -24;
+    limiter.knee.value = 3; limiter.ratio.value = 12;
+    listenGate = context.createGain();
+    receiveGain.connect(limiter).connect(listenGate).connect(context.destination);
     await context.audioWorklet.addModule('/capture-worklet.js');
     worklet = new AudioWorkletNode(context, 'capture-pcm16');
     source = context.createMediaStreamSource(stream);
@@ -64,8 +85,8 @@ $('connect').addEventListener('click', async () => {
 });
 $('disconnect').addEventListener('click', disconnect);
 const talk = $('talk');
-talk.addEventListener('pointerdown', (event) => { event.preventDefault(); talk.setPointerCapture(event.pointerId); speaking = true; });
+talk.addEventListener('pointerdown', (event) => { event.preventDefault(); talk.setPointerCapture(event.pointerId); setSpeaking(true); });
 for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-  talk.addEventListener(event, () => { speaking = false; });
+  talk.addEventListener(event, () => { setSpeaking(false); });
 }
-window.addEventListener('blur', () => { speaking = false; });
+window.addEventListener('blur', () => { setSpeaking(false); });

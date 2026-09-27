@@ -97,3 +97,74 @@
 - 随后只读打开主板 COM6（显式关闭 DTR/RTS）仍触发了板上自动复位，串口打印 `rst:0x1 (POWERON)`。这是一次**由串口打开引起的主板重启**，不是纯观察；今后诊断避免再次打开 COM6 破坏 A/B 状态。启动日志 `ap_ready`、`mode=IDLE`、`estop=false`、`fault=false`、`min_heap≈194–200 KB`，`vision_link.valid` 连续递增且 `bad=0`；未见 HTTP/内存/视觉串口错误。
 - 此次主板复位、保持 iPhone 外部热点 + iPad 小车 AP 的原拓扑后，用户报告 iPad 首页可打开、视频明显更流畅，2 分钟观察结束后再次确认画面比较流畅。CAM COM3 同步 `jpeg_fps≈5.4–6.0`、`stream_fps≈5.4–6.3`。随后在 iPad 视频前台持续 2 分钟的 57 个样本：成功发送平均 `5.46 FPS`、范围 `4.79–6.23`，编码平均 `5.56 FPS`，没有发送低于 3 FPS 的采样；`wifi=true`、最小内部堆保持 `25499` 字节。与故障时“编码 5–6、发送 0–1 FPS”形成同一路径的红/绿对照。
 - 现可说本地视频链路**短时恢复**，不能说已经定位到唯一根因或远程链路/通话验收。CAM 单独断电重启未恢复持续视频，而主板 AP 重启加原网络角色恢复后明显改善；两项变化在时间上相邻，无法严格分离是主板 AP/STA 状态、热点连接/信道/扫描，还是无线转发连接积累。Mac 反向 SSH 隧道 CAM 监听在主板重启后消失，Mac 当前不在用户手边，远程网页、音频、运动仍未验收。后续若复发，先保留原拓扑并同步记录 AP/STA 事件、信道、关联设备与 CAM RSSI/发送指标，再做单变量复现，不直接重刷两板。
+
+## 2026-09-26 Windows 双网与私网中继续测
+
+- Windows 当前通过 iPhone USB 网卡 `172.20.10.10/28` 上网、Wi-Fi `192.168.4.3/24` 连接小车，默认路由优先走有线热点；未切换网络。经解除本机网络沙箱限制的只读测试，主板首页 HTTP 302 约 9 ms、CAM 根路径预期 HTTP 404 约 99 ms。COM3/CAM 与 COM6/主板的 CH340 设备均枚举为 OK；本阶段未打开串口，避免触发主板重启。
+- 现有服务器公钥 SSH 正常；生产中继源码与本机测试版 SHA-256 一致。远程中继本地 `npm test` 7/7 PASS；用 `bootstrap_tailnet.sh` 在云机生成两枚独立随机令牌并保存在仅 root/carerover 可读的 `/etc/carerover/remote-hub.env`，无令牌打印或入库。安装既有 systemd 单元后服务 active，`127.0.0.1:8088/health` 显示 `audioPaired=false`、`controlDevice=false`、`videoFresh=false`（设备未接入时的预期状态）。
+- Windows 通过已有公钥建立 SSH 反向隧道，服务器仅在 `127.0.0.1:18081/18082` 监听主板/CAM；服务器端 GET 分别返回主板 HTTP 302、CAM HTTP 404。`8088/18081/18082` 均仅绑定服务器回环地址，没有开放公网通话网页、视频或控制端口。隧道依赖本次 Windows SSH 进程存活，尚未做自动重连及长时间质量验收。
+- Tailscale Serve 初次启用提示需管理者允许；用户点首次授权链接后显示 node 404。已改为请用户到 tailnet 管理后台 DNS 页面核对同一 tailnet 并启用 MagicDNS/HTTPS Certificates，**不要启用 Funnel**。因此 HTTPS/WSS 家长端尚不可访问，通话实测 NOT RUN。
+- 接线经用户再次澄清：INMP441 SCK→GPIO1、WS→GPIO2 **原本已经接好**，功放 MAX98357 BCLK→GPIO39、LRC→GPIO42；不是把麦克风迁至 GPIO40/41，也不能让两模块共用时钟 GPIO。其余为麦克风 SD→GPIO16、功放 DIN→GPIO21、SD→GPIO38。独立草图改为 I²S0 RX（1/2/16）和 I²S1 TX（39/42/21），正在复编译；**未烧录、未做声音实测**。GPIO39/42 若启用外部 JTAG 需另作分配。
+- 本阶段不声称远程通话完成。主板现行固件仍没有 I²S 音频任务或设备到云的音频连接；Tailscale 私网地址不能由未加入 tailnet 的 ESP32 直接访问，下一步需确定车旁 Windows 是否长期充当音频/视频网关，或另建可独立联网的设备路径。
+
+## 2026-09-26 迁移到用户当前 tailnet 与 HTTPS 首验
+
+- 用户选择把云服务器从原 Mac 所在的 `eddyzheng97@gmail.com` tailnet 迁到当前管理后台使用的 `new20070610@gmail.com` tailnet。服务器执行 Tailscale logout/relogin 后，`tailscale status --json` 核对到账号 `new20070610@gmail.com` 和后缀 `tail86bfa5.ts.net`，随后设备名设为 `carerover-relay`。旧 Mac 的子网路由不再属于同一个 tailnet；现阶段 Windows 双网反向 SSH 隧道仍可独立使用。
+- 仅替换服务环境文件中的 `AUDIO_PROXY_PUBLIC_ORIGIN` 为 `https://carerover-relay.tail86bfa5.ts.net`，原随机家长/设备令牌不变；`carerover-remote-hub.service` 重启后 active。Tailscale Serve 只在 tailnet 内将 HTTPS 443 反代到服务器 `127.0.0.1:8088`，未启用 Funnel，也未开放公网音视频端口。
+- 初次 HTTPS 握手卡在证书申请。tailscaled 日志显示 ACME 域名经服务器原 `100.96.0.2/3` DNS 查询超时；已在**云服务器**设置 `tailscale set --accept-dns=false`，并临时将 `eth0` systemd-resolved 的 DNS 指向测试可达的 `223.5.5.5`、`1.1.1.1`。证书随后成功签发。该 `resolvectl dns eth0` 是运行时设置，重启后需要持久化或重验；Tailscale 关闭 accept-dns 后，服务器自身不会解析 MagicDNS 名称，所以本机健康测试用 `curl --resolve` 保留正确 SNI/证书校验。
+- 使用证书校验的私有 HTTPS 健康端点返回预期 JSON：`audioPaired=false`、`controlDevice=false`、`videoFresh=false`。这只证明服务器网页入口与本机服务，不代表家长端设备可达、车端连接或远程通话/视频/控制验收。下一步由登录同一 tailnet 的家长设备打开健康页；随后实现/测试 Windows 网关与车端音频。
+- 独立音频草图按现场**已经接好**的麦克风 GPIO1/2/16、功放 GPIO39/42/21 改为 I²S0 RX + I²S1 TX，并完成 ESP32-S3 / 16 MB / OPI PSRAM 本地编译：程序 1,020,447 字节（32%）、全局变量 46,608 字节（14%）。尚未烧录或实测；刷写现有主板前须保存可恢复的当前 Flash 备份，实测结果不得以编译代替。
+
+## 2026-09-26 音频实物首测及整车恢复
+
+- 经用户确认四轮架空、舵机 5 V 断开，先读出主板 16 MB Flash 并计算 SHA-256（见 `audio-lab/docs/LOCAL_TEST_RECORD.md`），之后仅暂写应用分区进行独立音频实验。麦克风稳定采样约 50 帧/秒；功放与 8 Ω 扬声器能清楚播放 440 Hz 单音。实时本地自听因扬声器声反馈到麦克风而啸叫，不能作为远程全双工已通过的证据。
+- 改为功放静音录音 3 秒到 PSRAM，再单独播放 3 秒：150 帧录满、约 50 帧/秒播放、I²S 写入错误 0；用户确认能听到基本清楚人声并恢复安静。首版远程通话应采用按住说话的收发互斥半双工策略；在线音频链路及与整车功能并发均未验收。
+- 现场原 16 MB Flash 已全量写回主板并由 esptool 验证数据哈希，主板重启后串口显示原固件 `4e480f5e21e63c05-s5-follow`、IDLE、`ap=true`、CAM 包持续增长、MPU6050 有效。iPad 可见 AP 且能打开网页，但视频又出现历史卡顿/断连；Windows 当前扫描不到小车 SSID。正在用 iPad 单客户端直接请求 CAM `/stream` 分离问题路径。**不能把固件恢复等同于网页视频性能验收。**
+
+## 2026-09-27 直连视频与 AP 可见性复测
+
+- iPad 关闭控制台、直连 `http://192.168.4.2/stream` 后仍报告卡顿。CAM 串口此前在直连请求期间出现 JPEG 编码约 5.4–5.9 FPS、实际发送约 0.9–1.5 FPS；手势和人脸任务仍运行，丢帧/采集故障计数为 0。此时瓶颈发生在 CAM 编码之后的 HTTP/Wi-Fi 发送路径，不能归因于远程中继或网页人物框绘制。
+- Windows 经 iPhone USB 网卡继续上网，Wi-Fi 网卡状态 `Disconnected`；只读 `netsh wlan show networks mode=bssid` 未发现 `CareRover-EE68`，而 iPad 能加入。Windows USB 仍枚举 CAM COM3、主板 COM6 为 OK。AP 频道被热点 STA 拉动、扫描兼容性或 AP 状态问题均待验证，不能仅凭扫描结果定论。
+- 再次请 iPad 保持直连画面时，CAM 串口 15 秒连续统计 `gesture_fps≈6`、`face_fps≈3`，却有 `jpeg_fps=0`、`stream_fps=0`、`jpeg_total=107` 不变、`wifi=true`。已询问屏幕是连续变化、停在一帧还是空白；在用户确认前不能把浏览器显示的旧图算作实时流。
+- 暂未更改主板/CAM 固件或 Wi-Fi 配置，也未切换 Windows Internet。下一步先确定 iPad 的实时画面状态，再保持原有 iPhone 热点 + iPad 小车 AP 拓扑，仅重启主板做 A/B：若 CAM 发送 FPS 恢复，重点检查主板 AP/STA、信道、客户端与 HTTP 连接状态。远程通话、视频与运动仍未实物验收。
+- 用户随后确认直连页一直停顿。保持原拓扑只按主板 RST 后，iPad 反馈“稍好一些，但还是有些卡”，没有恢复到此前稳定约 5.5 FPS 的绿色基线；Windows 仍未扫描到 CareRover SSID。不能将单次 RST 视作修复。
+- 为准备 AP-only 隔离测试，仅在私有审查快照的 `wireless_runtime.cpp` 增加 `CAREROVER_DIAG_AP_ONLY` 条件编译，未触碰 `C:\CareRover`，未烧录。首次尝试以 Arduino-ESP32 3.3.10、但误用 SparkFun 1.1.1 和旧 `build_version.h` 标识直接编译，所得应用 SHA-256 `FEB886C160B93B52B99C0AD5E485FE6CF6139690C943743C5EFC5A71D0FB24A1`，**禁止烧录该首次产物**。已烧录并恢复的主板版本为 `4e480f5e21e63c05-s5-follow`，归档应用约 1.22 MB；其后的正确依赖重建见下节。
+
+## 2026-09-27 用户请求暂停：明确恢复点
+
+- **暂停时未烧录本轮 AP-only 固件。** 主板仍是恢复过的原应用 `4e480f5e21e63c05-s5-follow`；CAM 本轮未写入。不要把私有快照中的临时修改说成现板代码。Windows 仍通过 iPhone USB 网卡上网；本轮没有切换它的互联网连接。
+- 重新核对了主板原始 16 MB 备份：`main-web/build/backups/main_pre_audio_2026-09-26_full16mb.bin`，长度 16,777,216 B，SHA-256 `D739B6EC3139761E2E435185F4BA942F93564BCA982C13A0BC3717764AC678DA`。从备份偏移 `0x10000` 读取 1,224,032 B 的 SHA-256 为 `B9E1AF34520135C77DE65BCBA50CD035F1AD56B51FC18DBCA4B5C53DFA369AC7`，与 `C:\CareRover\build\stage5-follow-4e480f5e21e63c05-device\binaries\main_wireless.ino.bin` 完全一致；该归档应用可用于只恢复应用分区。
+- 进一步核对当前 `C:\CareRover` 源码经项目 `content_id` 生成的 DEMO_BALANCED 版本确为 `4e480f5e21e63c05`。私有快照与其主板源码只有 `wireless_runtime.cpp`（本轮诊断条件分支）和 `build_version.h`（本轮诊断标识）两文件不同。首次诊断包意外使用 SparkFun 1.1.1 且旧版本标识，**不得烧录**。
+- 最终候选诊断包用 Arduino-ESP32 3.3.10、正确的 SparkFun 1.1.2、相同 16 MB/OPI PSRAM FQBN 和 `compiler.cpp.extra_flags=-DCAREROVER_DIAG_AP_ONLY=1` 构建成功：`main-web/build/ap_only_diag_20260927_v2/main_wireless.ino.bin`，1,099,296 B，SHA-256 `EBCD2A4DBCE5821A6CD6A3BC32A1BF5FCFC69B97E6FB4FB6778111369E44E461`，内含 `wifi_diagnostic` 与 `4e480f5e21e63c05-s5-follow-apdiag` 标记。体积减少主要因 AP-only 构建让未引用的 Server酱 HTTPS 代码被剔除；这只是编译成功，**未做设备验收**。
+- 用户在候选包编译完成后要求“请先暂停并记录”。当时已发问确认舵机与功放两路 5 V 是否都断开，尚未收到明确“两路均已断开”的答复。恢复时先核对供电、四轮架空和网页 IDLE，再决定是否只写主板应用分区做 AP-only A/B。该测试会暂时暂停微信通知；仅测 iPad 直连 CAM 与控制台视频/串口 `jpeg_fps`、`stream_fps`、Windows 能否发现 CareRover AP，不执行运动。测试完用上述归档原应用恢复，确认固件版本、网页与推送拓扑，再继续远程网关及半双工通话。
+- 远程服务端私有 HTTPS 健康入口已建立，但车端控制/视频/音频尚未接入；家长设备尚未安装/登录当前 `new20070610@gmail.com` tailnet。远程通话尚不可使用，不能以本机测试或音频离线回放替代实物验收。
+
+## 2026-09-27 恢复调试：AP-only 短时 A/B
+
+- 现场再次确认主板/CAM USB 稳定、四轮架空、舵机及功放独立 5 V 断开；Windows 通过 iPhone USB 网卡上网，Wi-Fi 连 CareRover。服务器 `/health` 在测试前仍为 `audioPaired=false`、`controlDevice=false`、`videoFresh=false`，尚未打通车端。
+- 原 AP+STA 应用下，用户关闭全部控制台标签后主板首页 HTTP 302 可恢复至约 0.15–0.6 s；单开一个 iPad 页面时 Windows 对主板 HTTP 多次 3 s 超时，CAM 根路径大多 0.14–2.06 s、偶发超时。期间 WLAN 仍关联，RSSI 约 -32 dBm，主板 ping 0/3 丢包但延迟 2–166 ms，CAM ping 2/3 丢包且成功包约 740 ms。用户页面显示重连中、无视频；这不能仅用弱信号或浏览器绘制解释。
+- 核对原 16 MB 备份 SHA-256 仍为 `D739B6EC3139761E2E435185F4BA942F93564BCA982C13A0BC3717764AC678DA`；`COM6`/`COM3` 枚举 OK。使用 esptool 5.1.0 **只在主板 app0 地址 0x10000** 写入正确依赖构建的 AP-only 诊断应用（1,099,296 B，SHA-256 `EBCD2A4DBCE5821A6CD6A3BC32A1BF5FCFC69B97E6FB4FB6778111369E44E461`），`Hash of data verified`。CAM/NVS/FFat 均未写入；诊断期间微信推送暂停。烧录自动重启后 Windows 重新连 CareRover，iPhone USB 默认路由仍为 metric 25，Wi-Fi metric 50。
+- AP-only 空闲状态下主板 5/5 次首页 HTTP 302 均约 0.06–0.07 s，CAM 5/5 次根路径预期 HTTP 404 为约 0.01–0.11 s。用户只开一个 iPad 页面后报告页面明显打开更快、视频稍流畅，人物/手势及心率血氧数据可见；此为 AP-only 实物正向结果，但视频帧率尚未量化。
+- 同一单页打开期间，Windows 对主板首页 6/6 次 2 s 超时，而 CAM 根路径 6/6 次约 0.01–0.10 s。主板 HTTP 配置 `max_open_sockets=7`、`lru_purge_enable=false`，且静态资源无 `Connection: close`，因此第二客户端可能耗尽连接位；须进一步做受控连接测试，不能只据超时断言唯一根因。AP+STA 无线并发劣化与主板多客户端 HTTP 容量是两项独立待解决问题。
+- **当前现场主板运行临时 AP-only 诊断应用**，不是原 `4e480f5e21e63c05-s5-follow`，CAM 未改。下一阶段若继续远程网关，应明确选择短时保留 AP-only（微信暂停）或恢复原应用；原应用可从 `C:\CareRover\build\stage5-follow-4e480f5e21e63c05-device\binaries\main_wireless.ino.bin` 只写 app0 恢复。远程通话尚未实物验收。
+
+## 2026-09-27 Windows 网关视频/控制首验
+
+- 新增 `remote-hub/gateway`，通过 Windows 已存在的 CareRover Wi-Fi 访问主板 `/ws` 与 CAM `/stream`，通过 iPhone USB Internet 上的**本机回环 SSH 转发**访问服务器 `/device/ws`、`/device/frame`；并实现音频 `/audio` 的可选双向转发（当前主板尚无整车音频端点，默认关闭）。设备令牌由 SSH 临时读入进程内存，不打印或入库。MJPEG 解析、控制/视频/音频模拟端到端测试 2/2 PASS；这是软件测试。
+- 用户关闭 iPad 页面使网关独占 CAM 视频源；真实网关启动后报 `boardUp=true`、`relayUp=true`、`cameraUp=true`，约 20 秒 `boardMessages=296`、`framesUploaded=65`、`framesDropped=0`。云服务器实际 `/health` 从全 false 转为 `controlDevice=true`、`videoFresh=true`，几分钟后复查仍为 true；`audioPaired=false`，因此尚不能通话。未发任何运动指令，舵机/功放 5 V 仍断开。电脑默认互联网路由始终是 iPhone USB。
+- `david` Windows 已加入与服务器相同的 Tailscale tailnet；本机 `curl` 对 `https://carerover-relay.tail86bfa5.ts.net/health` 证书校验通过，HTTP 200 且返回上述真实状态。用户浏览器报告 `unexpectedly closed the connection`，正在区分浏览器代理/设备与私有 HTTPS 服务问题，尚未完成家长网页现场验收。
+- 主板 `Connection: close` 静态资源修正仅在本地诊断源码，首次中文路径编译到链接阶段失败（输出路径 Unicode 被工具链损坏），已改用授权目录的临时 ASCII `R:` 映射重新编译；**此修正尚未烧录**。当前板上仍是 AP-only 初版诊断应用。
+
+## 2026-09-27 家长网页与双向音频继续开发
+
+- Windows 系统代理 `127.0.0.1:7897` 与 tailnet 内 `100.x` 私有 HTTPS 地址不兼容：经代理的 `curl` TLS 握手失败，`--noproxy '*'` 直连返回 HTTP 200。用独立 `--no-proxy-server` Chrome 配置打开私有站点后，用户已完成登录，并现场确认远程页面显示视频、人物框、手势、心率血氧及 IMU 实时更新。未改变 Windows 的 iPhone USB 上网和 CareRover Wi-Fi 路由，也未启用公网 Funnel。
+- `main-web` 新增编译开关 `CAREROVER_AUDIO_GATEWAY`，在主板 HTTP 服务器挂载 `/audio` WebSocket；I²S0 接现有 INMP441 GPIO1/2/16，I²S1 接 MAX98357 GPIO39/42/21，GPIO38 仅在有下行音频帧时使能功放。帧沿用已测试的 16 kHz/20 ms PCM16 协议，三帧有界队列，播放时抑制麦克风上行以避免独立自听测试曾出现的啸叫。此代码仍在编译验证，**尚未烧录，更未完成真实远程通话验收**。
+- Windows 网关启动脚本增加显式 `-EnableAudio` 开关，缺省仍只转发已工作的控制/视频。网关软件测试 2/2 PASS；需等主板音频版编译、实物烧录与 `/audio` 上行验收后，才能重启网关启用音频。
+
+## 2026-09-27 音频实测、回声修复与剩余验收
+
+- 主板 audio1 应用只写 app0 且哈希校验通过；其 `/audio` 在功放断电时 6 秒收到 301 帧，约 50 帧/秒。Windows 网关开启音频后同时保持主板控制、CAM 视频、音频两路连接；服务器 `audioPaired=true` 时家长与车端 PCM 计数均增长。用户首轮听感确认双向声音可达，但家长说话时车端回声多且刺耳，不予通过。
+- 更新三层回声处理：主板下行衰减 `/8`、限制峰值并避免逐包切换功放，家长下行后 700 ms 抑制车端麦克风；Windows 网关同样抑制这段车端上行；家长网页按住说话及松开后的短暂时间不播放车端音频，收听通道加增益/限幅以解决原先电脑端音量低。网关 2/2、云中继 7/7 测试 PASS。云端旧 `client.js` 已保留独立备份，新版哈希 `FAB3D1BBB8FF240DB8C676D0186BC0CBC9433B8867BF4646054BF5FDFC42439E`，未重启服务。
+- 在用户确认两路外设 5 V 断电、车轮架空后，读回 audio1 实机应用并核对 SHA-256 `F58ED43BC91FD773B3FBC9082FBA5AD3C9923DCA7D5E676B9C67EA7DD3B6CF77`；audio2 应用 SHA-256 `1A88EDE9CB47C9EFF111902768EF35CC61001646579E9C68316D40D736BDA7A0`，只写主板 app0，Hash verified。Windows 重连小车 AP，网关重启加载新版代码后，服务器视频/遥测/音频三链路重新在线。
+- 用户刷新通话页后确认小车→电脑可听；功放上电空闲安静无发热；随后交替短句测试用户答复“两边都可以”。服务器 `audioPaired=true/controlDevice=true/videoFresh=true`，家长/车端帧计数增长，网关视频无明显上传丢帧。仍待用户明确回声改善后的具体听感，以及用**另一台独立联网家长设备**登录同一 tailnet 做跨设备验收。当前临时 AP-only 固件暂停 Server酱微信通知，舵机未上电、远程运动未验收。
+- 用户指出扬声器移远离电脑后回声减轻，支持同处一室时电脑麦克风再次拾取车端扬声器的声学耦合。后续用耳机或在不同房间演示；不能仅凭软件门控保证共处空间完全无回声。用户目前没有可独立上网的第二台家长设备，故异地验收暂不可执行；不要把本机经云中继的双向短句测试称为异地完成。云端通话 HTML 旧版也已备份并更新提示，浏览器刷新生效。

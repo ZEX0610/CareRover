@@ -2,13 +2,15 @@
 
 ## 与当前小车的引脚对照
 
-从 `C:\CareRover\docs\wiring-current.md` 和主板实际 `front_config.local.h` 核对：OLED=4/5，MPU6050=6/7，MAX30102=8/9，四轮=10/12/13/11，HC-SR04=14/15，CAM UART=17/18，原生 USB=19/20。主板引脚图在 `ESP32-S3开发\ESP32-S3开发板\ESP32-S3引脚图1.png`；以下五个候选 GPIO 均被引出且在上述现有功能中未占用。**接线前仍需按手里的同款主板丝印复核**。
+从 `C:\CareRover\docs\wiring-current.md` 和主板实际 `front_config.local.h` 核对：OLED=4/5，MPU6050=6/7，MAX30102=8/9，四轮=10/12/13/11，HC-SR04=14/15，CAM UART=17/18，原生 USB=19/20。现场确认 INMP441 的 SCK/WS **已经**分别占用 GPIO1/2，用户不希望把功放时钟再接到这两脚。主板引脚图在 `ESP32-S3开发\ESP32-S3开发板\ESP32-S3引脚图1.png`；功放选用 GPIO39/42，当前其他固件功能未占用。**接线前仍需按手里的同款主板丝印复核**；GPIO39/42 若将来启用外部 JTAG，则需要重新分配。
 
 | 信号 | 独立实验 ESP32-S3 主板 | INMP441 / MAX98357 模块 |
 |---|---:|---|
-| I²S BCLK/SCK | GPIO1 | 同接麦克风 `SCK`、功放 `BCLK` |
-| I²S WS/LRCLK | GPIO2 | 同接麦克风 `WS`、功放 `LRC/LRCLK` |
+| 麦克风 I²S BCLK/SCK | GPIO1（已接） | 仅接 INMP441 `SCK` |
+| 麦克风 I²S WS | GPIO2（已接） | 仅接 INMP441 `WS` |
 | 麦克风数据输入 | GPIO16 | INMP441 `SD` → GPIO16 |
+| 功放 I²S BCLK | GPIO39 | 仅接 MAX98357 `BCLK` |
+| 功放 I²S LRC/LRCLK | GPIO42 | 仅接 MAX98357 `LRC/LRCLK` |
 | 扬声器数据输出 | GPIO21 | GPIO21 → MAX98357 `DIN` |
 | 功放开关 | GPIO38 | GPIO38 → 1 kΩ → 功放 `SD/SD_MODE`；`SD` 对 GND 加 10 kΩ 下拉，防止开机时默认响 |
 | 麦克风声道 | — | INMP441 `L/R` → GND（左声道） |
@@ -16,7 +18,7 @@
 | 功放电源 | 新电源模块独立 5 V | `VIN/VCC` → 新模块 5 V，`GND` →公共 GND |
 | 扬声器 | — | 3 W/8 Ω 扬声器两线分别接 `OUT+`、`OUT−`；**任一喇叭线都不能接 GND** |
 
-不需要 MCLK。模块原理图 `MAX98357_TEST扬声器\MAX98357_TEST\原理图.png` 标明 SD_MODE 有 1 MΩ 上拉、GAIN 悬空（9 dB）、OUTP/OUTN 为桥接输出；若实物板的丝印/元件与图不同，以实物核查为准。MAX98357 **A** 接标准 I²S；若实物芯片尾字是 **B**，B 型的数据格式不同，应先确认型号再上电。商家旧图使用经典 ESP32 的 GPIO22/25/26/34，不能照搬到本项目 ESP32-S3。麦克风本地规格书在 `INMP441全向麦克风资料(1)\INMP441全向麦克风资料\INMP441.pdf`，供电允许 1.62–3.63 V，输出为 24 位数据、32 位声道槽，因此实验固件用 16 kHz×双声道×32 位，即 1.024 MHz BCLK。[TDK 原规格书](https://invensense.tdk.com/wp-content/uploads/2015/02/INMP441.pdf)、[ADI MAX98357 规格书](https://www.analog.com/media/en/technical-documentation/data-sheets/MAX98357A-MAX98357B.pdf)、[乐鑫双向 I²S 文档](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/api-reference/peripherals/i2s.html)。
+麦克风 RX 用 I²S0，功放 TX 用 I²S1，分别由现有 GPIO1/2 与新增 GPIO39/42 输出时钟；**四根线都单独接，不共接任何时钟 GPIO**。两路音频通过队列交换 20 ms 帧，并不要求两组时钟物理同步。不需要 MCLK。模块原理图 `MAX98357_TEST扬声器\MAX98357_TEST\原理图.png` 标明 SD_MODE 有 1 MΩ 上拉、GAIN 悬空（9 dB）、OUTP/OUTN 为桥接输出；若实物板的丝印/元件与图不同，以实物核查为准。MAX98357 **A** 接标准 I²S；若实物芯片尾字是 **B**，B 型的数据格式不同，应先确认型号再上电。商家旧图使用经典 ESP32 的 GPIO22/25/26/34，不能照搬到本项目 ESP32-S3。麦克风本地规格书在 `INMP441全向麦克风资料(1)\INMP441全向麦克风资料\INMP441.pdf`，供电允许 1.62–3.63 V，输出为 24 位数据、32 位声道槽，因此实验固件用 16 kHz×双声道×32 位，即每路 1.024 MHz BCLK。[TDK 原规格书](https://invensense.tdk.com/wp-content/uploads/2015/02/INMP441.pdf)、[ADI MAX98357 规格书](https://www.analog.com/media/en/technical-documentation/data-sheets/MAX98357A-MAX98357B.pdf)、[乐鑫双向 I²S 文档](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/api-reference/peripherals/i2s.html)。
 
 ## 两块电源模块怎么分
 
