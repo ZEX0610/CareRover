@@ -8,6 +8,7 @@ import { PpgChart } from './telemetry.js';
 import { VideoPanel } from './video.js';
 import { createFrontPanel } from './front-panel.js';
 import { DebugPanel } from './debug.js';
+import { initWorkspace } from './workspace.js';
 
 const $ = id => document.getElementById(id);
 const state = store.getState();
@@ -25,7 +26,7 @@ const text = (id, value) => { const el = $(id); const str = String(value); if (e
 const tr = (zh, en) => getLang() === 'zh' ? zh : en;
 const activeEstop = () => state.ui.estopLatch || state.robot.estop || state.robot.mode === 'ESTOP';
 const renderFront = createFrontPanel({state,send:message=>send(message),tr,stale:()=>store.isTelemetryStale(),signal:lifecycle.signal});
-const manual = () => store.isManualEnabled() && !$('confirmDlg').open && !document.hidden;
+const manual = () => store.isManualEnabled() && !$('confirmDlg').open && !document.hidden && ['overview', 'live'].includes($('app').dataset.view);
 const value = (v, decimals = 0, suffix = '') => Number.isFinite(v) ? v.toFixed(decimals) + suffix : '—';
 const signed = v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`;
 function toast(message, tone = '') {
@@ -203,7 +204,7 @@ function render() {
   text('ctlLock', enabled ? tr('按住移动，松开停止', 'Hold to move. Release to stop.') : locked ? tr('急停锁定', 'Emergency stop active') : stale ? tr('等待连接', 'Waiting for connection') : t('ctl.locked'));
   for (const [id, v] of [['vVx', state.ui.joystick.vx], ['vVy', state.ui.joystick.vy], ['vWz', state.ui.rotate]]) text(id, signed(v * state.ui.speedScale));
   text('speedVal', value(state.ui.speedScale * 100, 0, '%'));
-  for (const b of $('modeBar').querySelectorAll('[data-mode]')) {
+  for (const b of document.querySelectorAll('[data-mode]')) {
     b.setAttribute('aria-pressed', String(!stale && !locked && state.robot.mode === b.dataset.mode));
     b.dataset.pending = String(state.ui.requestedMode === b.dataset.mode);
     const unsupported = state.device.supported_modes ? !state.device.supported_modes.includes(b.dataset.mode) : state.device.backend === 'test_targets' && (!['IDLE', 'MANUAL', 'HEALTH_CHECK'].includes(b.dataset.mode) || state.device.stage < 4);
@@ -212,6 +213,9 @@ function render() {
   $('clearEstopBtn').hidden = !locked; $('clearEstopBtn').disabled = !transport?.isOpen || !!pendingClear || state.robot.control_allowed === false || (state.device.stage !== undefined && state.device.stage < 4);
   $('estopBtn').disabled = state.ui.replaying;
   text('estopLabel', locked ? tr('急停已锁定', 'E-STOP ENGAGED') : t('safety.estop'));
+  $('estopBtn').dataset.locked = String(locked);
+  $('estopBtn').setAttribute('aria-label', $('estopLabel').textContent);
+  $('estopBtn').title = `${$('estopLabel').textContent} · Esc`;
   $('dbgDrop').disabled = !transport?.isOpen || state.ui.replaying;
   text('footNote', state.ui.transportName === 'mock' ? tr('演示模式 · 数据由本地模拟生成', 'Demo mode · Locally simulated data') : state.connection.simulated ? tr('模拟设备 · WebSocket 与 MJPEG 通信', 'Simulated device · WebSocket & MJPEG') : tr('设备模式 · 数据来自 WebSocket', 'Device mode · Data received over WebSocket'));
   if (state.device.firmware) {
@@ -251,7 +255,9 @@ async function main() {
   if (transport.name === 'websocket' && new URLSearchParams(location.search).get('video') !== 'canvas') video.setSource('mjpeg');
   const offMessage = transport.onMessage(raw => receive(raw)); const offState = transport.onStateChange(linkChanged);
   const on = (id, event, fn) => $(id).addEventListener(event, fn, { signal: lifecycle.signal });
-  on('modeBar', 'click', e => { const button = e.target.closest('[data-mode]'); if (button) changeMode(button.dataset.mode); });
+  initWorkspace({ beforeViewChange: stop, signal: lifecycle.signal });
+  on('sidebarModes', 'click', e => { const button = e.target.closest('[data-mode]'); if (button) changeMode(button.dataset.mode); });
+  on('callBtn', 'click', () => toast(t('call.pending')));
   on('estopBtn', 'click', emergency); on('clearEstopBtn', 'click', requestClear);
   on('confirmYes', 'click', confirmClear); on('confirmNo', 'click', () => $('confirmDlg').close());
   on('langToggle', 'click', () => { setLang(getLang() === 'zh' ? 'en' : 'zh'); render(); });

@@ -1,17 +1,23 @@
-.remote-call {
-  grid-column: 1 / -1;
-  padding: 18px 22px;
-  border: 1px solid #343b44;
-  border-radius: 18px;
-  background: #191c21;
+.remote-call-dialog {
+  width: min(560px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 20px;
+  border: 1px solid var(--hair-strong);
+  border-radius: 20px;
+  background: var(--surface-1);
+  color: var(--text-1);
+  box-shadow: 0 30px 80px #0006;
 }
-.remote-call h2 { margin: 0 0 8px; font-size: 1.1rem; }
-.remote-call p { margin: 0 0 12px; color: #a9b2bd; }
-.remote-call iframe {
+.remote-call-dialog::backdrop { background: #0009; }
+.remote-call-dialog__head { display: flex; align-items: start; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.remote-call-dialog h2 { font-size: 1.15rem; }
+.remote-call-dialog p { margin-top: 5px; color: var(--text-2); font-size: .84rem; }
+.remote-call-dialog__head button { padding: 8px 12px; border-radius: 9px; background: var(--surface-2); }
+.remote-call-dialog iframe {
   display: block;
   width: 100%;
-  min-height: 265px;
+  height: min(370px, calc(100dvh - 150px));
   border: 0;
   border-radius: 12px;
-  background: #11151a;
+  background: var(--surface-sunk);
 }

@@ -4,7 +4,7 @@ from pathlib import Path
 import struct
 import tempfile
 import unittest
-from tools.carerover import check_partition_binary, validate_profile, read_log_text, runtime_files, windows_main_build_directory
+from tools.carerover import check_partition_binary, validate_profile, read_log_text, runtime_files, payload, windows_main_build_directory
 from tools.tracking import console_safe, windows_cam_build_directory, windows_idf_build_settings
 
 class BuildGuardTests(unittest.TestCase):
@@ -77,5 +77,13 @@ class BuildGuardTests(unittest.TestCase):
         self.assertTrue(any(p.name=='index.html' for p in files))
         self.assertFalse(any(p.suffix in {'.py','.log','.h','.txt'} for p in files))
         self.assertFalse(any('DELIVERY' in p.parts or 'hardware' in p.parts for p in files))
+
+    def test_r5_payload_has_one_generated_web_version(self):
+        with tempfile.TemporaryDirectory() as d:
+            version = payload(Path(d) / 'webroot')
+            html = (Path(d) / 'webroot' / 'index.html').read_text(encoding='utf-8')
+            self.assertEqual(1, html.count('name="carerover-web-version"'))
+            self.assertIn(f'content="{version}"', html)
+            self.assertIn('css/workspace.css', html)
 
 if __name__=='__main__': unittest.main()

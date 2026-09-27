@@ -73,7 +73,14 @@ test('serves the separate parent page and forwards paced PCM frames locally', as
       body: new URLSearchParams({ token: parentToken }) });
     assert.equal(login.status, 303);
     const cookie = login.headers.get('set-cookie').split(';')[0];
-    assert.match(await (await fetch(root, { headers: { Cookie: cookie } })).text(), /与孩子通话/);
+    const consoleHtml = await (await fetch(root, { headers: { Cookie: cookie } })).text();
+    assert.match(consoleHtml, /ui-20260926-r5/);
+    assert.match(consoleHtml, /id="remoteCallDialog"/);
+    assert.match(consoleHtml, /css\/workspace\.css/);
+    assert.equal((await fetch(`${root}/css/workspace.css`, { headers: { Cookie: cookie } })).status, 200);
+    assert.equal((await fetch(`${root}/js/workspace.js`, { headers: { Cookie: cookie } })).status, 200);
+    const remoteApp = await (await fetch(`${root}/js/app.js`, { headers: { Cookie: cookie } })).text();
+    assert.match(remoteApp, /new URL\('\/stream', location\.href\)/);
     assert.match(await (await fetch(`${root}/call`, { headers: { Cookie: cookie } })).text(), /按住说话/);
     assert.equal((await fetch(`${root}/style.css`, { headers: { Cookie: cookie } })).status, 200);
     device = await connect(`${root.replace('http:', 'ws:')}/audio`,

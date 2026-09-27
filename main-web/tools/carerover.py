@@ -8,6 +8,7 @@ import json
 import locale
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -131,7 +132,11 @@ def payload(destination):
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(p.read_bytes())
     index = destination / 'index.html'
-    index.write_text(index.read_text(encoding='utf-8').replace('<head>', f'<head>\n<meta name="carerover-web-version" content="{version}">', 1), encoding='utf-8')
+    html = index.read_text(encoding='utf-8')
+    meta = f'<meta name="carerover-web-version" content="{version}">'
+    html, count = re.subn(r'<meta name="carerover-web-version" content="[^"]*">', meta, html, count=1)
+    if not count: html = html.replace('<head>', f'<head>\n{meta}', 1)
+    index.write_text(html, encoding='utf-8')
     write_json(destination / 'version.json', {'web': version, 'source_commit': source_info()['source_commit']})
     return version
 

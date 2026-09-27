@@ -60,6 +60,10 @@ export class VideoPanel {
   }
   render(vision, flags) {
     if (this.kind === 'mjpeg' && !this.streamFailed && this.image.naturalWidth > 0) this.ready = true;
+    const width = this.kind === 'file' ? this.video.videoWidth : this.kind === 'mjpeg' ? this.image.naturalWidth || vision.image_width : vision.image_width;
+    const height = this.kind === 'file' ? this.video.videoHeight : this.kind === 'mjpeg' ? this.image.naturalHeight || vision.image_height : vision.image_height;
+    const aspect = width > 0 && height > 0 ? `${width} / ${height}` : '4 / 3';
+    if (this.stage.style.aspectRatio !== aspect) this.stage.style.aspectRatio = aspect;
     if (this.kind === 'canvas') this.drawScene(vision, flags.personStale);
     let mapped = vision;
     if (this.kind === 'file' && this.video.videoWidth && this.video.videoHeight) {

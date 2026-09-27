@@ -13,7 +13,6 @@ class TrackingToolTests(unittest.TestCase):
     def test_board_exact_source_snapshots(self):
         expected={
             'firmware/main_wireless/front_guard.h':'742ac674aacfeaf122135f77ff53d3df333ce02548e7d869cb23d64ad5eaf32e',
-            'firmware/main_wireless/build_version.h':'93178d352ea307f98b3847f46f3d4c1558156be2bbb2dabdcf65fc3d4bfbe95d',
             'firmware/cam_tracking/board_exact_shared/vision_protocol.h':'fc815f36cce0ef984abdb4809c25488e09a24c04ac305b4e74cff9775276fbb9',
             'firmware/cam_tracking/board_exact_shared/box_track.h':'fd465bffb1aa5f1e2f594462032fe2df983ce3bbcf31bfb5730bb5bba9c9385e',
             'firmware/cam_tracking/board_exact_shared/demo_tuning.h':'bb87f76c5eb8acd96ba06b0200afe7e161daf0fa5dfd24f648408f9d9d19fa9f',
@@ -22,6 +21,14 @@ class TrackingToolTests(unittest.TestCase):
             source=tracking.ROOT/relative
             self.assertTrue(source.is_file(),relative)
             self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(),digest,relative)
+
+    def test_current_build_version_header_is_well_formed(self):
+        # The 2026-09-22 build_version.h digest is historical; subsequent
+        # flashed applications intentionally update this generated header.
+        header=(tracking.ROOT/'firmware/main_wireless/build_version.h').read_text(encoding='utf-8')
+        self.assertRegex(header,r'#define CAREROVER_BUILD_VERSION "[0-9a-f]{16}-s5-follow(?:-[\w-]+)?"')
+        self.assertIn('#define CAREROVER_STAGE 5',header)
+        self.assertIn('#define CAREROVER_INTEGRATION 3',header)
 
     def test_front_diagnostics_and_private_installation_remain_protected(self):
         with tempfile.TemporaryDirectory() as d:

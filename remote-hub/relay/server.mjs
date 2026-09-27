@@ -45,6 +45,7 @@ export async function makeServer({ deviceToken, parentToken, tlsKey, tlsCert,
   const workletJs = await readFile(join(here, 'public', 'capture-worklet.js'));
   const css = await readFile(join(here, 'public', 'style.css'));
   const consoleCss = await readFile(join(here, 'public', 'css', 'app.css'));
+  const workspaceCss = await readFile(join(here, 'public', 'css', 'workspace.css'));
   const extraCss = await readFile(join(here, 'public', 'css', 'remote.css'));
   const jsFiles = new Map(await Promise.all((await readdir(join(here, 'public', 'js')))
     .filter((name) => /^[a-z0-9-]+\.js$/.test(name))
@@ -121,7 +122,8 @@ export async function makeServer({ deviceToken, parentToken, tlsKey, tlsCert,
     }
     const file = path === '/' ? consolePage : path === '/call' ? page : path === '/client.js' ? clientJs :
       path === '/capture-worklet.js' ? workletJs : path === '/style.css' ? css : null;
-    const asset = path === '/css/app.css' ? consoleCss : path === '/css/remote.css' ? extraCss :
+    const asset = path === '/css/app.css' ? consoleCss :
+      path === '/css/workspace.css' ? workspaceCss : path === '/css/remote.css' ? extraCss :
       path.startsWith('/js/') ? jsFiles.get(path.slice(4)) : null;
     if (!file && !asset) { res.writeHead(404).end(); return; }
     res.setHeader('Content-Type', path === '/' || path === '/call' ? 'text/html; charset=utf-8' :

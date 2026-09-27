@@ -9,7 +9,8 @@ export class PpgChart {
       c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
-    ctx.strokeStyle = 'rgba(255,255,255,.055)'; ctx.lineWidth = 1;
+    const dark = document.documentElement.dataset.theme === 'dark';
+    ctx.strokeStyle = dark ? 'rgba(255,255,255,.07)' : 'rgba(0,0,0,.07)'; ctx.lineWidth = 1;
     for (let i = 1; i < 8; i++) { ctx.beginPath(); ctx.moveTo(w * i / 8, 0); ctx.lineTo(w * i / 8, h); ctx.stroke(); }
     ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
     const windowMs = CONFIG.PPG_WINDOW_SECONDS * 1000, from = now - windowMs;
@@ -24,9 +25,9 @@ export class PpgChart {
       if (previous === null || time - previous > 150) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       previous = time; last = { x, y };
     });
-    ctx.strokeStyle = valid ? '#76d9c5' : '#62676d'; ctx.lineWidth = 1.8; ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.strokeStyle = valid ? (dark ? '#e5e5ea' : '#3a3a3c') : (dark ? '#8e8e93' : '#86868b'); ctx.lineWidth = 1.8; ctx.lineJoin = 'round'; ctx.stroke();
     if (valid && last && now - ppg.lastTs < 500) {
-      ctx.fillStyle = '#b4f4df'; ctx.beginPath(); ctx.arc(last.x, last.y, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = dark ? '#ffffff' : '#1d1d1f'; ctx.beginPath(); ctx.arc(last.x, last.y, 3, 0, Math.PI * 2); ctx.fill();
     }
   }
 }

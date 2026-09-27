@@ -1,12 +1,18 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="color-scheme" content="dark">
+<meta name="color-scheme" content="light dark">
 <meta name="description" content="CareRover 多模态移动健康机器人 · 网页控制台">
 <title>CareRover 控制台</title>
+<script>
+// Restore appearance before first paint, including when storage is unavailable.
+try { document.documentElement.dataset.theme = localStorage.getItem('carerover.theme') === 'dark' ? 'dark' : 'light'; } catch {}
+</script>
 <link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/workspace.css">
+<meta name="carerover-web-version" content="ui-20260926-r5">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='none' stroke='%230A84FF' stroke-width='2.5'/><circle cx='16' cy='16' r='4' fill='%230A84FF'/></svg>">
 </head>
 <body>
@@ -37,21 +43,34 @@
   <symbol id="i-chevron" viewBox="0 0 24 24">
     <path d="m9 6 6 6-6 6"/>
   </symbol>
-</svg>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 4.2a2 2 0 0 1 3.4 0l7.7 13.5a2 2 0 0 1-1.7 3H4.3a2 2 0 0 1-1.7-3Z"/><path d="M12 9v5m0 3v.1"/></symbol><symbol id="i-phone" viewBox="0 0 24 24"><path d="M6.7 3H4.5C3.7 3 3 3.7 3 4.5 3 13.6 10.4 21 19.5 21c.8 0 1.5-.7 1.5-1.5v-2.2c0-.7-.5-1.3-1.1-1.5l-3.1-.8c-.5-.1-1 0-1.4.4l-1.3 1.3a14 14 0 0 1-6.8-6.8l1.3-1.3c.4-.4.5-.9.4-1.4l-.8-3.1C8 3.5 7.4 3 6.7 3Z"/></symbol><symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"/></symbol><symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 14.5A9 9 0 0 1 9.5 3.5a9 9 0 1 0 11 11Z"/></symbol><symbol id="i-sidebar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></symbol><symbol id="i-overview" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol><symbol id="i-camera" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="12" cy="12" r="4"/></symbol><symbol id="i-robot" viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="13" rx="4"/><path d="M12 3v4M8 12v2m8-2v2M9 17h6"/></symbol><symbol id="i-idle" viewBox="0 0 24 24"><path d="M8 4v16M16 4v16"/></symbol><symbol id="i-manual" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></symbol><symbol id="i-follow" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M7 19v-2a5 5 0 0 1 10 0v2M3 8V4h4M17 4h4v4M3 16v4h3m12 0h3v-4"/></symbol><symbol id="i-gesture" viewBox="0 0 24 24"><path d="M7 12V7a1.5 1.5 0 0 1 3 0v4-7a1.5 1.5 0 0 1 3 0v7-6a1.5 1.5 0 0 1 3 0v7-4a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-11 3l-4-6a1.5 1.5 0 0 1 2-2l3 3"/></symbol><symbol id="i-debug" viewBox="0 0 24 24"><path d="m8 5-6 7 6 7m8-14 6 7-6 7M14 3l-4 18"/></symbol></svg>
 
-<main class="app" id="app">
+<aside class="sidebar" id="sidebar" aria-label="主导航" data-i18n-attr="aria-label:nav.label">
+  <div class="sidebar__brand"><span class="sidebar__logo">C<span>•</span></span><div><strong>CareRover</strong><small>CONTROL CENTER</small></div></div>
+  <div class="sidebar__section" data-i18n="nav.workspace">工作空间</div>
+  <nav class="sidebar__nav"><button type="button" class="navbtn" data-view="overview" aria-label="总览" data-i18n-attr="aria-label:nav.overview;title:nav.overview"><svg class="ico" aria-hidden="true"><use href="#i-overview"/></svg><span data-i18n="nav.overview">总览</span></button><button type="button" class="navbtn" data-view="live" aria-label="实时视野" data-i18n-attr="aria-label:nav.live;title:nav.live"><svg class="ico" aria-hidden="true"><use href="#i-camera"/></svg><span data-i18n="nav.live">实时视野</span></button><button type="button" class="navbtn" data-view="health" aria-label="生理监测" data-i18n-attr="aria-label:nav.health;title:nav.health"><svg class="ico" aria-hidden="true"><use href="#i-heart"/></svg><span data-i18n="nav.health">生理监测</span></button><button type="button" class="navbtn" data-view="robot" aria-label="机器人状态" data-i18n-attr="aria-label:nav.robot;title:nav.robot"><svg class="ico" aria-hidden="true"><use href="#i-robot"/></svg><span data-i18n="nav.robot">机器人状态</span></button><button type="button" class="navbtn" data-view="debug" aria-label="调试与联调" data-i18n-attr="aria-label:nav.debug;title:nav.debug"><svg class="ico" aria-hidden="true"><use href="#i-debug"/></svg><span data-i18n="nav.debug">调试与联调</span></button></nav>
+  <div class="sidebar__section" data-i18n="nav.modes">运行模式</div><div class="sidebar__modes" id="sidebarModes"><button type="button" class="navbtn" data-mode="IDLE" aria-label="待机" data-i18n-attr="aria-label:mode.IDLE;title:mode.IDLE"><svg class="ico" aria-hidden="true"><use href="#i-idle"/></svg><span data-i18n="mode.IDLE">待机</span><i class="mode-dot" aria-hidden="true"></i></button><button type="button" class="navbtn" data-mode="MANUAL" aria-label="手动" data-i18n-attr="aria-label:mode.MANUAL;title:mode.MANUAL"><svg class="ico" aria-hidden="true"><use href="#i-manual"/></svg><span data-i18n="mode.MANUAL">手动</span><i class="mode-dot" aria-hidden="true"></i></button><button type="button" class="navbtn" data-mode="PERSON_FOLLOW" aria-label="跟随" data-i18n-attr="aria-label:mode.PERSON_FOLLOW;title:mode.PERSON_FOLLOW"><svg class="ico" aria-hidden="true"><use href="#i-follow"/></svg><span data-i18n="mode.PERSON_FOLLOW">跟随</span><i class="mode-dot" aria-hidden="true"></i></button><button type="button" class="navbtn" data-mode="GESTURE_CONTROL" aria-label="手势" data-i18n-attr="aria-label:mode.GESTURE_CONTROL;title:mode.GESTURE_CONTROL"><svg class="ico" aria-hidden="true"><use href="#i-gesture"/></svg><span data-i18n="mode.GESTURE_CONTROL">手势</span><i class="mode-dot" aria-hidden="true"></i></button><button type="button" class="navbtn" data-mode="HEALTH_CHECK" aria-label="健康" data-i18n-attr="aria-label:mode.HEALTH_CHECK;title:mode.HEALTH_CHECK"><svg class="ico" aria-hidden="true"><use href="#i-heart"/></svg><span data-i18n="mode.HEALTH_CHECK">健康</span><i class="mode-dot" aria-hidden="true"></i></button>
+    <button class="navbtn navbtn--estop" id="estopBtn" type="button" aria-keyshortcuts="Escape" aria-label="紧急停止" title="紧急停止 · Esc">
+      <svg class="ico" aria-hidden="true"><use href="#i-alert"/></svg><span id="estopLabel">紧急停止</span>
+    </button>
+    <button class="navbtn navbtn--clear" id="clearEstopBtn" type="button" hidden data-i18n-attr="aria-label:safety.clear;title:safety.clear">
+      <svg class="ico" aria-hidden="true"><use href="#i-rot-l"/></svg><span data-i18n="safety.clear">解除急停</span>
+    </button>
+  </div>
+  <div class="sidebar__bottom">
+    <span class="sidebar__section" data-i18n="theme.appearance">外观</span>
+    <div class="appearance" role="group" aria-label="外观" data-i18n-attr="aria-label:theme.appearance">
+      <button type="button" data-theme-choice="light"><svg class="ico" aria-hidden="true"><use href="#i-sun"/></svg><span data-i18n="theme.light">浅色</span></button>
+      <button type="button" data-theme-choice="dark"><svg class="ico" aria-hidden="true"><use href="#i-moon"/></svg><span data-i18n="theme.dark">深色</span></button>
+    </div>
+    <span class="sidebar__device"><svg class="ico" aria-hidden="true"><use href="#i-robot"/></svg><span>CareRover <small data-i18n="nav.device">多模态移动机器人</small></span></span>
+  </div>
+</aside>
+<main class="app" id="app" data-view="overview">
 
   <!-- ── Header ──────────────────────────────────────────────────────── -->
   <header class="topbar" id="topbar">
-    <div class="brand">
-      <div class="brand__mark" aria-hidden="true">
-        <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="13"/><circle class="brand__dot" cx="16" cy="16" r="4"/></svg>
-      </div>
-      <div class="brand__text">
-        <h1 class="brand__name">CareRover</h1>
-        <p class="brand__sub" data-i18n="app.subtitle">多模态移动健康机器人 · 控制台</p>
-      </div>
-    </div>
+    <div class="workspace-heading"><button type="button" class="sidebar-toggle" id="sidebarToggle" aria-controls="sidebar" aria-expanded="true" aria-label="切换侧边栏" data-i18n-attr="aria-label:nav.toggle;title:nav.toggle"><svg class="ico" aria-hidden="true"><use href="#i-sidebar"/></svg></button><span class="workspace-heading__brand">CareRover</span><span class="breadcrumb-separator">/</span><span id="viewTitle">总览</span></div>
 
     <div class="topbar__right">
       <div class="linkstat" id="linkStat" data-state="disconnected">
@@ -62,19 +81,21 @@
         <div class="topmetric"><dt data-i18n="top.latency">延迟</dt><dd id="mLatency">—</dd></div>
         <div class="topmetric"><dt data-i18n="top.link">链路</dt><dd id="mTransport">MOCK</dd></div>
       </dl>
+      <button type="button" class="call-button" id="callBtn" aria-label="通话（即将上线）" data-i18n-attr="aria-label:call.title;title:call.title"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg></button>
+      <button type="button" class="icon-button" id="themeToggle" aria-label="切换外观" data-i18n-attr="aria-label:theme.toggle;title:theme.toggle"><svg class="ico" aria-hidden="true"><use href="#i-sun"/></svg><svg class="ico" aria-hidden="true"><use href="#i-moon"/></svg></button>
       <button class="ghostbtn" id="langToggle" type="button" title="Switch language" aria-label="Switch language">EN</button>
     </div>
   </header>
 
   <section class="session" aria-label="会话状态">
     <div><p class="eyebrow">CAREROVER / CONTROL CENTER</p><h2 id="sessionTitle">等待机器人连接</h2><p id="sessionDescription">正在准备控制台。</p></div>
-    <span class="session__edition">PROTOTYPE <b>01</b></span>
+
   </section>
 
   <!-- ── 摄像头 ───────────────────────────────────────────────────────── -->
   <section class="panel panel--video" aria-labelledby="hCam">
     <div class="panel__head">
-      <h2 class="panel__title" id="hCam" data-i18n="cam.title">摄像头</h2>
+      <div class="panel-heading"><span class="panel-heading__icon"><svg class="ico" aria-hidden="true"><use href="#i-camera"/></svg></span><h2 class="panel__title" id="hCam" data-i18n="cam.title">摄像头</h2></div>
       <div class="panel__tools">
         <span class="tag" id="visionStale" hidden data-i18n="cam.stale">视觉数据过期</span>
         <label class="srcpick">
@@ -115,7 +136,7 @@
   <!-- ── 机器人状态 ────────────────────────────────────────────────────── -->
   <section class="panel panel--status" aria-labelledby="hRobot">
     <div class="panel__head">
-      <h2 class="panel__title" id="hRobot" data-i18n="robot.title">机器人状态</h2>
+      <div class="panel-heading"><span class="panel-heading__icon"><svg class="ico" aria-hidden="true"><use href="#i-robot"/></svg></span><h2 class="panel__title" id="hRobot" data-i18n="robot.title">机器人状态</h2></div>
       <span class="tag tag--warn" id="telemStale" hidden data-i18n="robot.stale">遥测中断</span>
     </div>
 
@@ -147,15 +168,16 @@
         <span class="statrow__k" data-i18n="robot.battery">电池</span>
         <span class="statrow__v"><span class="battery" id="sBatt"><i class="battery__fill" style="width:0%"></i></span><span class="num" id="sBattPct">—</span></span>
       </div>
-      <div class="statrow"><span class="statrow__k" data-i18n="robot.linkcam">摄像头链路</span><span class="statrow__v"><span class="dotstat" id="sLinkCam"></span></span></div>
-      <div class="statrow"><span class="statrow__k" data-i18n="robot.linkmcu">主控链路</span><span class="statrow__v"><span class="dotstat" id="sLinkMcu"></span></span></div>
+      <div class="statrow statrow--link"><span class="statrow__k" data-i18n="robot.linkcam">摄像头链路</span><span class="statrow__v"><span class="dotstat" id="sLinkCam"></span></span></div>
+      <div class="statrow statrow--link"><span class="statrow__k" data-i18n="robot.linkmcu">主控链路</span><span class="statrow__v"><span class="dotstat" id="sLinkMcu"></span></span></div>
     </div>
+    <button class="status-details" type="button" data-open-view="robot"><span data-i18n="robot.details">查看详细状态</span><svg class="ico" aria-hidden="true"><use href="#i-chevron"/></svg></button>
   </section>
 
   <!-- ── 健康 ────────────────────────────────────────────────────────── -->
   <section class="panel panel--health" aria-labelledby="hHealth">
     <div class="panel__head">
-      <h2 class="panel__title" id="hHealth" data-i18n="health.title">生理监测</h2>
+      <div class="panel-heading"><span class="panel-heading__icon"><svg class="ico" aria-hidden="true"><use href="#i-heart"/></svg></span><h2 class="panel__title" id="hHealth" data-i18n="health.title">生理监测</h2></div>
       <span class="tag" id="healthState">—</span>
     </div>
 
@@ -191,7 +213,7 @@
   <!-- ── 控制 ────────────────────────────────────────────────────────── -->
   <section class="panel panel--control" aria-labelledby="hCtl">
     <div class="panel__head">
-      <h2 class="panel__title" id="hCtl" data-i18n="ctl.title">运动控制</h2>
+      <div class="panel-heading"><span class="panel-heading__icon"><svg class="ico" aria-hidden="true"><use href="#i-manual"/></svg></span><h2 class="panel__title" id="hCtl" data-i18n="ctl.title">运动控制</h2></div>
       <span class="tag tag--muted" id="ctlLock" data-i18n="ctl.locked">需切换至手动模式</span>
     </div>
 
@@ -213,6 +235,11 @@
       </div>
 
       <div class="control-side">
+        <div class="control-range" id="controlFrontRange" data-tone="muted">
+          <span data-i18n="ctl.frontDistance">前方距离</span>
+          <strong class="num" id="controlFrontDistance">—</strong>
+          <small id="controlFrontNote">测距未知</small>
+        </div>
         <div class="vec">
           <div class="vec__item"><span>vx</span><b class="num" id="vVx">+0.00</b></div>
           <div class="vec__item"><span>vy</span><b class="num" id="vVy">+0.00</b></div>
@@ -238,26 +265,6 @@
 
         <p class="hintkeys" data-i18n="ctl.keys">键盘：W A S D 平移 · Q E 旋转 · 空格停止 · Esc 急停</p>
       </div>
-    </div>
-  </section>
-
-  <!-- ── 模式 + 急停 ──────────────────────────────────────────────────── -->
-  <section class="dock" aria-label="模式与安全">
-    <div class="modes" id="modeBar" role="group" aria-label="控制模式">
-      <span class="modes__ind" id="modeInd" aria-hidden="true"></span>
-      <button class="modebtn" type="button" data-mode="IDLE"><span data-i18n="mode.IDLE">待机</span></button>
-      <button class="modebtn" type="button" data-mode="MANUAL"><span data-i18n="mode.MANUAL">手动</span></button>
-      <button class="modebtn" type="button" data-mode="PERSON_FOLLOW"><span data-i18n="mode.PERSON_FOLLOW">跟随</span></button>
-      <button class="modebtn" type="button" data-mode="GESTURE_CONTROL"><span data-i18n="mode.GESTURE_CONTROL">手势</span></button>
-      <button class="modebtn" type="button" data-mode="HEALTH_CHECK"><span data-i18n="mode.HEALTH_CHECK">健康</span></button>
-    </div>
-
-    <div class="safety">
-      <button class="estop" id="estopBtn" type="button">
-        <span class="estop__ring" aria-hidden="true"></span>
-        <span class="estop__label" id="estopLabel">紧急停止</span>
-      </button>
-      <button class="clearbtn" id="clearEstopBtn" type="button" hidden data-i18n="safety.clear">解除急停</button>
     </div>
   </section>
 

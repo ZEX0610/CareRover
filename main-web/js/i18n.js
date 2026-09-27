@@ -8,6 +8,26 @@
 
 const DICT = {
   zh: {
+    'call.title': '远程通话入口',
+    'call.pending': '通话请在已连接 Tailscale 的 HTTPS 家长端使用',
+    'ctl.frontDistance': '前方距离',
+    'robot.details': '查看详细状态',
+    'theme.appearance': '外观',
+    'theme.light': '浅色',
+    'theme.dark': '深色',
+    'theme.toggle': '切换浅色 / 深色外观',
+
+    'nav.label': '主导航',
+    'nav.workspace': '工作空间',
+    'nav.modes': '运行模式',
+    'nav.overview': '总览',
+    'nav.live': '实时视野',
+    'nav.health': '生理监测',
+    'nav.robot': '机器人状态',
+    'nav.debug': '调试与联调',
+    'nav.toggle': '切换侧边栏',
+    'nav.device': '多模态移动机器人',
+
     'cam.file.open': '打开文件',
     'cam.gesture': '手势识别', 'cam.unavailable': '正在等待视频信号', 'dbg.drop': '模拟断线', 'dbg.resume': '返回实时', 'ctl.pad': '全向平移摇杆',
     'app.subtitle': '多模态移动健康机器人 · 控制台',
@@ -118,6 +138,26 @@ const DICT = {
   },
 
   en: {
+    'call.title': 'Remote call',
+    'call.pending': 'Use the HTTPS parent portal on a device connected to Tailscale',
+    'ctl.frontDistance': 'Front distance',
+    'robot.details': 'View robot details',
+    'theme.appearance': 'APPEARANCE',
+    'theme.light': 'Light',
+    'theme.dark': 'Dark',
+    'theme.toggle': 'Switch light / dark appearance',
+
+    'nav.label': 'Main navigation',
+    'nav.workspace': 'WORKSPACE',
+    'nav.modes': 'MODES',
+    'nav.overview': 'Overview',
+    'nav.live': 'Live view',
+    'nav.health': 'Vitals',
+    'nav.robot': 'Robot status',
+    'nav.debug': 'Debug',
+    'nav.toggle': 'Toggle sidebar',
+    'nav.device': 'Multimodal mobile robot',
+
     'cam.file.open': 'Open file',
     'cam.gesture': 'GESTURE', 'cam.unavailable': 'Waiting for video signal', 'dbg.drop': 'Disconnect once', 'dbg.resume': 'Return to live', 'ctl.pad': 'Omnidirectional joystick',
     'app.subtitle': 'Multi-modal Mobile Health Robot · Console',

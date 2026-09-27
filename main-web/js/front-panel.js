@@ -37,6 +37,12 @@ export function createFrontPanel({ state, tr, stale }) {
     const mode=state.robot?.mode;
     el('frontTitle').textContent=tr('前方距离','Front distance');
     el('frontDistance').textContent=view.distance;
+    // Both displays use the same freshness decision; never retain a stale range.
+    el('controlFrontDistance').textContent=view.distance;
+    el('controlFrontRange').dataset.tone=!view.valid?'muted':['BLOCKED','STOPPED'].includes(view.status)?'bad':['WARN','SLOW','BYPASS'].includes(view.status)?'warn':'normal';
+    el('controlFrontNote').hidden=view.valid;
+    el('controlFrontNote').textContent=view.valid?'':label(view.status);
+
     if(mode==='IDLE') {
       el('frontStatus').textContent=f?.seated?tr('已入座','Seated'):tr('已离座','Vacant');
       el('frontStatus').dataset.tone='normal';
