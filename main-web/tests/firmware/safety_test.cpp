@@ -10,7 +10,11 @@ void error(const char* actual, const char* expected) { assert(actual && std::str
 void zero(const SafetyController& s, uint64_t now) {
   const auto v = s.snapshot(now).target; assert(v.vx == 0 && v.vy == 0 && v.wz == 0);
 }
-SafetyController ready(uint64_t now = 10) { SafetyController s; s.network(true, now); s.cameraPacket(now); return s; }
+SafetyController ready(uint64_t now = 10) {
+  SafetyController s; s.network(true, now); s.cameraPacket(now);
+  s.cliffSample(0,1); s.cliffSample(0,32); // Known tabletop for legacy motion tests.
+  return s;
+}
 int main() {
   {
     const std::string a=R"({"type":"ping","label":"[[[\""})";

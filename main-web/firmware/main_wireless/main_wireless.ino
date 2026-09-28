@@ -11,6 +11,7 @@
 #include "oled_ui.h"
 #include "ppg_rate_estimator.h"
 #include "signal_state_filters.h"
+#include "watch_link.h"
 #include "wireless_runtime.h"
 
 // CareRover main ESP32-S3 pin allocation.
@@ -659,10 +660,23 @@ void serviceOled(uint32_t nowMs) {
   snapshot.gestureValid = snapshot.camConnected && gestureFilter.accepted();
   snapshot.gestureLabel = snapshot.gestureValid ? gestureFilter.label() : "--";
   snapshot.gestureScoreMilli = snapshot.gestureValid ? gestureFilter.scoreMilli() : 0;
-  snapshot.heartRateValid = heartRateValid;
-  snapshot.heartRateBpm = currentHr();snapshot.heartRateHeld=hrHeld();
-  snapshot.spo2Valid = spo2Valid;
-  snapshot.spo2Percent = currentSpo2();snapshot.spo2Held=spo2Held();
+  const auto watch = watchLinkSnapshot();
+  const bool wristContact = watch.online(nowMs) && watch.packet.contact;
+  snapshot.wristHealthSource = wristContact;
+  if (wristContact) {
+    const auto& wrist = watch.packet;
+    snapshot.heartRateValid = wrist.hrValid;
+    snapshot.heartRateBpm = wrist.hr;
+    snapshot.heartRateHeld = wrist.hrHeld;
+    snapshot.spo2Valid = wrist.spo2Valid;
+    snapshot.spo2Percent = wrist.spo2;
+    snapshot.spo2Held = wrist.spo2Held;
+  } else {
+    snapshot.heartRateValid = heartRateValid;
+    snapshot.heartRateBpm = currentHr();snapshot.heartRateHeld=hrHeld();
+    snapshot.spo2Valid = spo2Valid;
+    snapshot.spo2Percent = currentSpo2();snapshot.spo2Held=spo2Held();
+  }
   const auto front=wirelessFront();snapshot.frontEnabled=front.enabled;snapshot.frontValid=front.valid;
   snapshot.frontCm=front.distanceCm;snapshot.frontStatus=front.status;snapshot.frontPhase=carerover::phaseName(front.phase);
   snapshot.stopReason=wirelessStopReason();

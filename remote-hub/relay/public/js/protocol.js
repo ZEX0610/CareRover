@@ -12,7 +12,9 @@ import { MODES, SYSTEM_MODES, GESTURES, HEALTH_STATES } from './config.js';
 export const ALL_MODES = [...MODES, ...SYSTEM_MODES];
 
 /** 入站消息类型白名单。 */
-export const IN_TYPES = ['telemetry', 'ppg', 'ppg_batch', 'ack', 'error', 'pong'];
+export const IN_TYPES = ['telemetry', 'ppg', 'ppg_batch', 'ack', 'error', 'pong', 'care_event', 'care_state'];
+const CARE_KINDS = ['face_absent','face_restored','seat_left','seat_returned',
+  'call_invite','call_cancelled','call_connected','call_ended'];
 /** 出站消息类型白名单。 */
 export const OUT_TYPES = ['cmd_vel', 'set_mode', 'estop', 'clear_estop', 'ping'];
 
@@ -101,6 +103,17 @@ export function decode(raw) {
 
   switch (o.type) {
     case 'telemetry': return { ok: true, msg: { ...normalizeTelemetry(o), ts } };
+    case 'care_event': {
+      const kind = enumOf(o.kind, CARE_KINDS);
+      if (!kind || typeof o.event_id !== 'string' || o.event_id.length > 96)
+        return { ok: false, error: 'invalid care event' };
+      return { ok: true, msg: { type: 'care_event', kind, event_id: o.event_id,
+        active: bool(o.active, false), sequence: num(o.sequence), ts } };
+    }
+    case 'care_state': return { ok: true, msg: { type: 'care_state',
+      camera_online: bool(o.camera_online, false), face_alert_active: bool(o.face_alert_active, false),
+      seat: enumOf(o.seat, ['seated','vacant','unknown'], 'unknown'),
+      call_requested: bool(o.call_requested, false), audio_paired: bool(o.audio_paired, false), ts } };
     case 'ppg':       return num(o.value) === undefined ? { ok: false, error: 'invalid PPG sample' } : { ok: true, msg: { type: 'ppg', ts, value: o.value } };
     case 'ppg_batch': return { ok: true, msg: normalizePpgBatch(o, ts) };
     case 'ack':       return { ok: true, msg: {
@@ -129,11 +142,17 @@ export function normalizeTelemetry(o) {
   const c = obj(o.connection);
   if (c) out.connection = { camera: bool(c.camera), main_mcu: bool(c.main_mcu), simulated: bool(c.simulated) };
 
+  const call = obj(o.call);
+  if (call && typeof call.requested === 'boolean' &&
+      Number.isSafeInteger(call.sequence) && call.sequence >= 0) {
+    out.call = { requested: call.requested, sequence: call.sequence };
+  }
+
   const f = obj(o.front);
   if(f) {
     const cm=num(f.distance_cm), age=num(f.age_ms);
     const valid=f.valid===true && cm!==undefined && cm>=2 && cm<=400 && age!==undefined && age>=0 && age<220;
-    out.front={ enabled:f.enabled===true, ready:f.ready===true, valid,
+    out.front={ enabled:f.enabled===true, ready:f.ready===true, valid, call_paused:f.call_paused===true,
       distance_cm:valid?cm:null, age_ms:age!==undefined&&age>=0?age:220,
       seated:f.seated===true, release_required:f.release_required===true,
       status:enumOf(f.status,['DISABLED','UNCONFIGURED','UNKNOWN','CLEAR','WARN','SLOW','BLOCKED','STOPPED','BYPASS'])??'UNKNOWN',

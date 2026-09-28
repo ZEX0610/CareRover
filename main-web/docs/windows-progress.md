@@ -229,3 +229,77 @@
 - iPhone182 顶层 R5 复测确认能听到小车麦克风，但按住约 5 秒后车端仍无声。服务器当次仅收到 `parentFrames=22`，约 0.44 秒，因而重点转向手机触摸保持事件。增加真实 `touchstart`→`touchend` 处理与永久可见的“麦克风采集/已发送”计数，旧版触摸红测试失败，新版 relay 10/10 PASS。第二次只部署六个网页文件（含独立通话页 CSS），备份 `/opt/carerover/backups/relay-before-top-level-call-20260927T072323Z.tar`，上传归档 SHA-256 `896ddfc2c31c61c42fe5aa17b73db4fb2cf95cc42e68be664b3cd4cb9bac257f`；服务和车端控制/视频恢复。
 - 第二次现场复测服务器已收到 `parentFrames=184`，随后累计 `498`；Windows 网关 `audioDownFrames` 同步从 `273` 增至 `771`，用户确认“手机按住说话小车扬声器才有声音”。这符合当前按住说话、松开收听的半双工交互；iPhone182 也已确认松开后能听到小车麦克风。**异设备双向音频链路已现场接通**。持续音质、回声及视频/数据并行表现仍待最后一轮交替验收，不据此宣称长期稳定。
 - 随后用户完成约 20 秒的交替短句复测，回复“两端清楚，视频数据正常”。据此可验收当前 iPhone182 经 Tailscale 私有 HTTPS → 云中继 → Windows 网关 → 小车的**短时远程双向半双工通话**，并确认这段测试中视频和实时数据并行可用。未做长时间掉线重连、舵机上电运动或公网免 Tailscale 访问验收；主板仍为 AP-only 音频诊断应用，Server酱微信推送暂停。
+
+## 2026-09-27 手表无线只读接收联调（进行中）
+
+- 用户确认舵机 5 V 断开、四轮架空、IDLE、无进行中的通话/必须保持的网页会话；手表外部 5 V 继续关闭，手表只由电脑 USB 供电。COM3 再次核验为主板 16 MB ESP32-S3（MAC `68:ee:8f:60:68:24`），COM7 为手表 8 MB ESP32-S3-PICO-1。
+- 更新前完整主板 Flash 已读取并校验：`build/backups/main-before-watch-rx-20260927.bin`，16,777,216 B，SHA-256 `18D444010F630965FA613C15F119B60CA2BBDD76DC908DE200527248379B92A2`；旧 app0 SHA-256 与已有 audio2 应用完全相同。只写主板 app0 的只读手表接收版 1,141,376 B，SHA-256 `D243233E177BD13E99F0A366A65EF0BD4A714BA3F05BE06BA678BA7AF1483EAD`，esptool 哈希校验通过；CAM、NVS、FFat 未写。版本 `...-audio2-watchrx1`、IDLE、无急停/故障。C++14 接收状态机测试 PASS。
+- 手表 USB 供电固件仅写 COM7 app0，I²C PPG 保持关闭。发现无人监听的手表 USB CDC 逐包打印会使本应 20 Hz 的 Wi-Fi 上行周期性阻塞；去掉运行时逐包打印后，COM3 连续 18 秒每秒收到约 20 个新序号，包龄约 0–40 ms、无离线。用户动作阶段连续约 38 秒序号 1928→2670，在线/校准始终为真，三类运动分量均曾非零。分段方向、归中漂移尚待核对；这仅是只读数据通路，不驱动车轮。详情 `docs/WATCH_LINK_RX_2026-09-27.md`。
+- 主板重启初期一度读到 `vision_link.valid=0`；用户随后确认 CAM 已供电、本地视频正常，再测约 7 秒 valid 2224→2268、bad 1→2、resync 3→4，证明 CAM UART 在手表 20 Hz 并发期间有有效帧。MAX30102 外部 5 V、电平转换和 Zero USB/外部 5 V 并接问题未处理，用户目前无法返工、无万用表，因此未测心率/血氧、未切独立供电。
+- 用户随后确认 iPad 人物框和“一根手指”手势均随视频更新。手表动作后静止仍曾持续发出 `vy=-0.45`；同姿态按 B 归中后连续 15 秒 `vy/wz=0`、`vx≈-0.013`，没有继续发散。相对航向在多次动作后累积偏移，需要在驾驶模式实现前明确归中/漂移处置，不能把当前只读链路等同于手表控制验收。音频和长时间并发仍未复验。
+- 本轮回归：主板 Arduino 编译 PASS，手表 Arduino 编译 PASS，主板接收状态机 MinGW C++14 测试 PASS，Python 39/39、网页 Node 24/24 PASS，`git diff --check` PASS。仓库内旧 `.venv` 指向另一台 Windows 的 Python 路径，故 Python 回归改用本机 Anaconda Python 3 的 pytest；不影响测试结果。未提交或推送本轮改动。
+- 最终 8 秒串口复查：手表 `online=true`、已校准、包龄 39 ms、归中后 `vx=-0.015/vy=0/wz=0`；主板仍 IDLE、无急停/故障，CAM valid 4838→4894，bad 2、resync 4 均未增加。用户确认本地视频、人物框及一根手指手势正常。此结果仍不能替代外部供电、心率血氧或电机运动验收。
+
+## 2026-09-27 手表心率血氧代码复用（进行中）
+
+- 按用户要求，手表侧 `watch_health.h` 已改为复用主板当前 DEMO_BALANCED 的 `DemoPpg`、`TimedMetric` 和脉搏周期估算，输入源仍是手表 MAX30102 独立 I²C，结果沿现有 `watch_v1` UDP 的 `contact/hr/spo2/sqi/valid/held/age` 字段传输；主板接收代码无需改变，仍只读显示、不参与车轮运动。
+- 手表合成波形和状态回归 `watch_native_test PASS`（75 BPM、91% 演示血氧；无波形保持、采样超时和无接触清除）。主板接收状态机新增有效/失效健康字段测试，MinGW C++14 PASS。默认固件 `WATCH_ENABLE_PPG=0` 编译 PASS，程序 926,163 B / 全局 RAM 53,216 B；启用版仅做编译检查，不在未确认电压的焊接线上烧录启用。
+- 电气未验收：MAX 模块 D/C 已直接焊于 Zero GPIO6/7、可能为 5 V 上拉；Zero USB 与外部 5 V 同接的反灌状况也未测。现场无万用表且暂不能返工。因此尚无真实 MAX 采样或血氧准确性证据，不应让用户此刻拔 USB 改外部独立电源。
+- PPG 启用版另以编译参数 `WATCH_ENABLE_PPG=1` 仅离线编译 PASS：程序 927,299 B / 全局 RAM 53,216 B，app SHA-256 `F79736400D17581AC5EA6F89ED19C241EFC1201D2EBF5931CA7BAF53F0344029`。此版未烧录。默认关闭版 app SHA-256 `178B1D2D62F49B4A02A9207E781EA96372B8364C3DBE8446EE96AFF94FA734A2`；待确认 COM7 供电状态后才能写入并做无 PPG 的链路回归。
+- COM7 再次识别为手表 N8R8 MAC `ac:27:6e:d2:c7:ec`，此前整片 8 MB 备份尺寸/哈希核对一致；仅将默认 PPG 关闭版写入手表 app0 @0x10000，esptool 写后哈希校验通过。COM7 启动日志 `MPU=1`、`PPG_DISABLED_UNTIL_LEVEL_CHECK`、`WATCH_WIFI_CONNECTED ip=192.168.4.3`；COM3 主板连续约 8 秒 `watch_status` 序号 847→988、约 20 包/秒、在线/已校准、包龄 0–39 ms、静止动作约 0，健康有效标志均为 0（预期）。外部 5 V 未开启，真实 MAX、腕部数值及独立供电仍未验收。
+
+## 2026-09-27 手表健康数据 OLED 来源显示
+
+- 按用户已确认的 IDLE、舵机 5 V 断开、四轮架空、无通话且主板 USB 稳定条件，主板 OLED 现按同一来源选取一对心率/血氧：手表链路在线且报告接触时选手表，其他情况回落车载；右侧 `W`/`C` 标明来源，有接触但数值未成熟时显示 `--`，保持值显示 `H`。只读手表接收不参与运动。手表 PPG 未启用，因此当前无法现场验收手表数值或 `W` 实际显示。
+- Arduino CLI 用 16 MB / `app3M_fat9M_16MB` / OPI PSRAM 和当前 AP-only、音频网关宏编译 PASS：程序 1,141,366 B，全局 RAM 59,640 B；app 长度 1,141,520 B，SHA-256 `419F015D6F7397BC9D76E154B7A27FDE6BD9D08FCA5ACC652E0964DCED873A5C`。MinGW C++14 `watch_link_test` PASS；`git diff --check` PASS。
+- COM3 只读核验为主板 ESP32-S3、16 MB Flash、MAC `68:ee:8f:60:68:24`。烧录前只读备份当前 app0 3,145,728 B 至 `build/backups/main-before-watch-oled-20260927-app0.bin`，SHA-256 `EFF7B891E660042DDDD6CB695765151B0DE8F5C37DAA823FA31271C3F9219EB0`，其前 1,141,376 B 与旧 watchrx1 app 二进制逐字节一致。随后仅写主板 app0 @`0x10000`，esptool `Hash of data verified`；未写 CAM、NVS、FFat 或手表。
+- 实机串口核对新版本 `...-watchrx1-oled1`、AP 在线、模式 IDLE、无急停/故障；手表序号 38139→38280，每秒约 20 包，包龄 0–39 ms；CAM valid 543→606、bad/resync 维持 0。手表 HR/SpO2 有效标志仍为 0，符合 MAX 未上电。OLED 屏幕的人工目视和网页刷新结果待用户回复，不把串口当作显示验收。
+- 用户请求跳过电压核对直接接通手表独立 5 V。商家模块原理图外侧 I²C D/C 由 `5V_PU` 上拉，JP2 可接内部 5 V，而 D/C 已直焊 Zero GPIO6/7、无万用表且不能返工；用户确认外部 5 V 尚未接通。因此保留手表 `WATCH_ENABLE_PPG=0`，不把离线已编译的 PPG-on 二进制烧入手表，也不要求用户开始独立供电测试。软件无法消除可能的 5 V I/O 或 USB 反灌风险；实物条件未满足。
+- 用户目视确认主板 OLED 心率/血氧旁显示来源字母 `C`，本地网页视频正常。由此验收当前车载来源显示与网页视频回归；手表 `W` 来源及真实腕部心率/血氧仍未验收。
+
+## 2026-09-28 四角红外防跌落（右前单路已烧录，待触发实测）
+
+- 用户给出四个 YL-62 规划为 3.3 V 供电、共地，越过灰白桌面时 OUT 高；左前/右前/右后/左后 OUT 拟接主板 GPIO40/41/47/48。随后明确**目前仅右前 GPIO41 实际接好**，其他三路未接；用户明确右后阻止的是**向右横移**。
+- 在主板 5 ms 安全输出路径新增四角高电平即时拦截、低电平连续 30 ms 后释放。仅 MANUAL 模式：左前禁 `vy<0`、右前禁 `vx>0`、右后禁 `vy>0`、左后禁 `vx<0`；任一角高电平禁 `wz!=0`。对角线只去掉被禁分量，其他方向保留。当前 `CliffInstalledMask=0x02`，**仅右前实际启用**；另外三角逻辑虽已实现但未启用，待实物接线验证后改为 `0x0f`。遥测新增 `cliff` 状态，串口 `wireless_status` 新增 `cliff_mask` 和已安装位掩码。详情 `docs/CLIFF_GUARD_2026-09-28.md`。
+- 新四角 C++ 测试 PASS，已纳入 `tools/check_firmware.py`；原有 8 套 C++ 固件测试 PASS，网页 Node 24/24 PASS，`git diff --check` PASS。Arduino CLI 1.5.1 / ESP32 core 3.3.10 在 ASCII 临时目录以当前 AP-only、音频网关参数编译 PASS：程序 1,142,166 B（36%）、全局 RAM 59,680 B（18%）。第一次直接在中文工作区编译时链接器路径失真，故改用临时目录；最终镜像 `build/cliff-fr1-20260928-app.bin` 为 1,142,320 B，SHA-256 `91D395B3E75C3C61E448A59124A5D3504D21D37E71B64BC3E32B35D3CD12D398`。
+- 用户确认四轮架空、舵机 5 V 断开、IDLE、无通话、右前 3.3 V 供电并许可更新主板 app；COM6 只读识别为原主板 MAC `68:ee:8f:60:68:24`、16 MB Flash。更新前完整 Flash 已读入 `build/backups/main-before-cliff-20260928-full.bin`，16,777,216 B，SHA-256 `3D45B208C3B48229620373A8B8A0CEE8BB013FDEC89576C22033EFF36491F979`。新镜像分区表与备份原表逐字节一致。仅写 COM6 主板 app0 @`0x10000`，esptool `Hash of data verified`；未写 CAM、FFat、NVS、分区表或 bootloader。
+- 烧录后 COM6 115200 检查：固件后缀 `-clifffr1`、AP 在线、`mode=IDLE`、`fault=false`、`estop=false`、`cliff_installed_mask=2`、静置 `cliff_mask=0`，8 秒无重启迹象。CAM 的 `vision_link.valid` 此时为 0，尚不能据此判定视频断链，待网页与 CAM 实测。右前红外 LOW→HIGH→LOW 的现场状态和电机输出均尚未验收；车轮、舵机仍不运行。
+- 其后 COM6 连续观察到 GPIO41 对应的 `cliff_mask` 在 `0` 与 `2` 间反复变化；下一段 8 秒读数持续为 `0`。已询问用户跳变时是否正移动灰白测试纸，以区分有意触发与电位器临界抖动。无车轮运动，不能把串口状态变化称作防跌落实车验收。
+- 只读检查 GitHub：`main` 仍为 `2b1016c`；新网页改动在 NeedleAss 的 `codex/web-call-ui` 分支，`247e36e` 比 `main` 超前 1 提交，涉及 `remote-hub/relay/public` 六个文件和一项触摸测试。该更新未合入 `main`、未同步本地/部署服务器；本轮不擅自合并以免覆盖已有未提交手表/OLED 工作。GitHub 仓库元数据目前显示 `visibility=public`，与用户此前希望仓库仅本人和 NeedleAss 可访问的要求不符，应由有管理员权限者在 GitHub 设置中改回 Private 并审核历史公开内容。
+
+## 2026-09-28 五指切换手表控制、双红外与 GitHub 通话网页
+
+- 用户确认当前仅右前 OUT→GPIO41、左后 OUT→GPIO48，两路 3.3 V 供电/共地、悬空输出高；左前和右后尚未接。手表只保留 Zero＋MPU6050，无 MAX30102。车轮架空、舵机 5 V 断开。安装掩码改 `0x0a`；右前阻止前进、左后阻止后退，任一路高电平阻止两种旋转，在手动和新手表模式均生效。未安装的两角不提供防跌落覆盖。
+- 新增 `WATCH_CONTROL`：CAM 连续识别五指动作进入，再次放下/重新五指后退出；进入需新鲜已校准手表包，并先收到**进入后的新中立包**才允许运动。手表姿态持续保持且按约 20 Hz 更新才持续运动，回中立、B 键重新归中、第二次五指、网页 IDLE/急停或手表包超过 350 ms 未更新均停车。网页只显示手表模式，不允许网页直接请求进入。前向超声和车体倾斜保护继续生效；详情 `docs/WATCH_CONTROL_2026-09-28.md`。
+- GitHub `codex/web-call-ui` 提交 `247e36e` 的远程页面变更已同步到本地 `remote-hub/relay/public`；额外修正两端网页对 `WATCH_CONTROL` 的遥测解析与中文/英文显示。主板 AP 页面仍沿用 R5 主布局，其电话按钮明确提示改用 Tailscale HTTPS 家长端（普通 `192.168.4.1` HTTP 无浏览器麦克风权限）。Node 本地页 25/25、远程中继 12/12 测试 PASS；手表模式上报可显示但不可从网页发起有两端自动回归。暂未将工作区推回公开的 GitHub 仓库。
+- 远程页面 tar SHA-256 `DABA720A7BF5FF322240D57748FFB14BCEACE193C2112E934596591946F4A5E3` 已在现有服务器先备份后部署，备份 `/opt/carerover/backups/relay-before-top-level-call-20260927T184351Z.tar`，服务 active、本机 `/health` 正常。新 UI 把**同一个**视频节点移到顶层通话弹窗，不另占 CAM 视频连接；通话仍使用原有 16 kHz 双向音频网关。部署时 Windows 车端网关未运行，`controlDevice/videoFresh=false`，故真实远程媒体需网关恢复后再验收。
+- 固件原生十套测试 PASS，Arduino CLI 在 ASCII 目录编译 PASS（程序 1,143,014 B，静态 RAM 59,696 B）。用户许可更新后只读识别 COM6 为原主板 MAC `68:ee:8f:60:68:24`、16 MB；更新前整片备份 `build/backups/main-before-watchctl-cliff2-20260928-full.bin`，16,777,216 B，SHA-256 `B55C45C32FCC9C5745BE5B45A1EB2783B168C39B9A8DD6F6069EEC6DCA1063EC`。新编译分区表与实机备份逐字节一致；只写 app0 @`0x10000`（1,143,168 B，SHA-256 `78E4BB986A872F355C42A78A893A0E5F6D6B36E20814F97430680E3EBC8D4CBC`）和 FFat @`0x610000`（10,354,688 B，web version `1f8c9fc1777e29c4`，SHA-256 `7B2C0D2DA1DF2240E80A5D0103720B40B0A9348A5B4BFEA09BC399546E27CB6B`），两段均 `Hash of data verified`；未写 CAM、NVS、bootloader、分区表或手表。
+- 复位后 COM6 12 秒串口显示 `...-watchctl1-cliff2`、AP 在线、IDLE、无 fault/estop，`cliff_installed_mask=10`，CAM `vision_link.valid` 442→489 且 bad=0，安全任务间隔峰值约 6 ms。手表尚未通电时 `watch_status.online=false` 符合预期。架空状态 GPIO48 对应位在 `cliff_mask=10` 和 `2` 之间跳变，不能据此断定已校准；须人工对灰白桌面/悬空做稳定电平对照。尚未做运动和真实五指切换验收。
+- 此刻 Windows 的 WLAN 是互联网链路（183.173.103.205），并未连接小车 AP；为遵守“不切断电脑互联网”，未擅自切 WLAN，已请用户先建立独立 USB 上网。Windows 网关尚不能恢复，远程媒体链路待 dual-network 条件满足后验证。
+- 用户之后建立 iPhone USB `172.20.10.10` 独立上网，WLAN 已是 CareRover `192.168.4.4`；绑定 USB 源地址的 SSH 到云服务器成功，局域网主板首页 HTTP 302 正常，`/?transport=ws&video=mjpeg` 实机 HTML 标记 web version `1f8c9fc1777e29c4`。`gateway/start-windows.ps1 -EnableAudio` 已启动且保持运行，状态 `boardUp/relayUp/cameraUp/audioBoardUp/audioRelayUp=true`、视频帧持续上传。私有 Tailscale HTTPS `/health` 返回 200，中继经回环健康检查 `controlDevice=true/videoFresh=true`；`audioPaired=false` 因没有家长端正在通话。CAM 视频流曾短暂自行重连，本地其他视频标签关闭后连续上传，目前未测真正双端新 UI 通话听感。
+- 手表仅 Zero＋MPU，经 USB 上电后主板连续收到约 20 包/秒、`watch_status.online=true`、`cal=1`、包龄约 0–52 ms、静止 `vx/vy/wz≈0`；MAX 未连接，HR/SpO2 有效标志均为 0。CAM `vision_link.valid` 同时持续增加且 bad=0。五指开/关模式尚待实际手势验收。
+- 红外实物对照：右前对灰白桌面、仅左后悬空时 10 秒每秒 `cliff_mask=8`；左后对桌面、仅右前悬空时约 9 秒每秒 `cliff_mask=2`；两路均对桌面时约 8 秒每秒 `cliff_mask=0`。第一轮移动对照的时序不清，故以三段稳定记录为准。证明两路输入能独立识别现有测试面，但没有驱动车轮，也不证明未安装角落安全。
+- 首次实物五指尝试被 CAM 分类为 `four`，未切模式；用户张开拇指重试后，CAM 连续识别 `five` 并产生 `gesture_action FIVE ok=true`，主板进入 `WATCH_CONTROL`。该次车身被倾斜放置，IMU 触发 `tilt_fault`，模式立即回到 IDLE 且速度归零。车身直立后再次五指成功进入手表模式，主板约 2 秒保持 `WATCH_CONTROL`，手表中立 `vx/vy/wz=0`、红外掩码 0；记录见 `build/windows/main-watch-five-upright-20260928.jsonl`。
+- 首次手表动作记录中，`WATCH_CONTROL` 收到转动目标 `wz=0.35` 以及平移目标 `vx=0.254, vy=0.091`；随后车身 IMU 自身升至俯仰约 46°、横滚约 60°，保护退出 IDLE、目标速度清零。用户确认当时连小车本体也一起拿起，并非手表数据单独致停。车身固定后 IMU `tilt_fault=false`、红外 0；但随后 70 秒复试无新手势，因为 CAM 实际未上电，`vision_link.valid` 全程固定 12862。手表包仍在线且变化，但模式保持 IDLE、目标速度始终 0，所以该次“无运动”是预期安全行为。
+- 用户给 CAM 上电后，同一串口反馈回路由 `vision_link.valid` 70 秒增量 0 变为 8 秒增量 52，链路恢复；未改固件。又一次五指在 CAM 仅连续维持约 0.9 秒（随后变 `no_hand/no_gesture`），未达到切换判定，主板仍 IDLE；尚未完成车身固定条件下的完整手表动作/归中/第二次五指退出与舵机上电运动验收。远程新通话 UI 的异设备现场复验也尚待完成。
+- iPhone182 经独立互联网/Tailscale 打开新版远程页，用户确认“已连接，可以通话”；中继 `/health` 同期 `controlDevice=true`、`videoFresh=true`，`parentFrames` 从 0 增至 119，车端网关亦记录 119 帧下行。此轮用户未逐项回答视频/人物框/音质细节，因此仅将短时通话链路记为恢复，不能证明长时间并发稳定。
+- 用户反馈通话时远程“手动”按钮完全点不动；主板另一路只读 WebSocket 遥测显示 `mode=IDLE`、`estop=false`、`control_allowed=true`、`supported_modes` 含 `MANUAL`、`motion_output_installed=true`，说明固件没有主动禁用手动模式。远程网页当前用 `showModal()` 打开占满手机屏幕的通话框，后方控制按键不能同时操作；但用户尚未做“关弹窗后按钮是否可点”的 A/B，故根因只能列为最可能，不能宣称已修复。另舵机 5 V 一直断开，即使命令到达也不会有实际轮子运动。用户要求烧录完毕后暂时停止，后续再验收；没有擅自给舵机上电、放开防跌落/倾斜保护或改动通话 UI。
+
+## 2026-09-28 四路红外与 CALL 来电手势更新
+
+- 用户确认四路 YL-62 接线为左前 GPIO40、右前 GPIO41、右后 GPIO47、左后 GPIO48，3.3 V 供电/共地、悬空时 HIGH；车轮架空、舵机 5 V 断开、IDLE、无通话并许可更新。`CliffInstalledMask` 改为 `0x0f`，既有手动/手表模式过滤逻辑覆盖四个方向及任一角禁止旋转；不将此保护宣称覆盖人物跟随或其它自主模式。
+- CAM 所用 ESP-DL 模型类别定义含小写 `call`，主板转大写并经重复帧锁存后切换 `call.requested`、递增 `call.sequence`。远程家长网页按新序号显示来电/结束通话；iPhone 浏览器麦克风仍必须由家长点击接听授权，不会静默自动接听或后台推送。
+- GitHub `main` 与本地 HEAD 均为 `2b1016cfdd9d5b1fc5d1a2c5ddf58a56acb706a3`（对比接口 0 提交差异）。远程页面 CALL 增量已部署到服务器，旧版备份 `/opt/carerover/backups/relay-before-top-level-call-20260928T145502Z.tar`；主板 FFat 为当前 R5 页面加版本/协议文档更新，并非另有未同步的 main 提交。
+- Node：主板网页 25/25、云中继 14/14、Windows 网关 2/2 PASS；新 CALL 和四角原生 C++ 测试 PASS。Arduino CLI 在 ASCII 暂存目录编译 PASS。烧录前完整 Flash 备份 `build/backups/main-before-cliff4-call-20260928-full.bin`，16,777,216 B，SHA-256 `402459447B03F27EB29BB164B2C899ECC2C7B5A29416E908B86769CEC253436C`。实机分区表与新镜像逐字节一致。COM6 确认为主板 MAC `68:ee:8f:60:68:24`。仅写 app0 @`0x10000`（SHA-256 `1FB05377FE8131A2EF67D3B3937ABAB86A626214C9C643168413B277F1D65EBB`）及 FFat @`0x610000`（版本 `a33499357c5bccf5`，SHA-256 `CB89383A61AD17EC0C94AC61F128B17849ACF8F7D95FA2F5DF7E4B203BF9174A`）；两段均 `Hash of data verified`，未写 CAM/NVS/bootloader/分区表。
+- 复位后 COM6 12 秒串口确认固件后缀 `-cliff4-call1`、AP 在线、IDLE、无 fault/estop、`cliff_installed_mask=15`。但 `cliff_mask=15` 持续为全高，且此时 `vision_link.valid=0`、IMU 未就绪；需现场核实四探头是否对准桌面、模块供电及 CAM 供电。**未**完成四路 LOW/HIGH/LOW 对照或真实来电手势验收，舵机未上电。
+- Windows 独立 iPhone USB 网卡 `以太网 3` 在线并承载默认互联网路由；WLAN 已接 `CareRover-EE68`，主板 HTTP 302→200（约 0.15 秒），CAM `192.168.4.2` 连接超时。Windows 网关音频/控制已连服务器，`boardUp=true`、`relayUp=true`、`audioBoardUp=true`、`audioRelayUp=true`，但 `cameraUp=false`，远程视频尚不可用。需先恢复 CAM 再做用户侧通话验收。
+- 用户随后明确澄清：**此刻 CAM 与四个红外模块都尚未接线**，与此前“接线确认”的回复不一致。因四个输入均配置上拉，未接线时 `cliff_mask=15` 正是预期的失效保护，不能将其诊断为坏模块或已完成防跌落验收；CAM 未接线也解释 `vision_link.valid=0` 和视频超时。保持舵机 5 V 断开、车轮架空，待接线后分别做四角低/高电平对照和真实 CALL 手势/远端通话验收。
+
+## 2026-09-29 通话期间暂停超声实测
+
+- 用户明确要求通话期间关闭 HC-SR04、结束后恢复，不新增急停；现场确认四轮架空、舵机 5 V 断开、IDLE、无通话、主板 USB 稳定，授权完整备份后烧录。现有前方超声避障在通话期间没有新测距，不能视为仍可用；四角红外逻辑未改。
+- 中继家长 `/audio` 建立/断开时经 Windows 网关向主板音频 WebSocket 发送 `call_state`，连接期间每秒续租；主板 3 秒无续租自动恢复。主板暂停时 TRIG 保持 LOW、不再触发新测距；遥测增加 `front.call_paused`，串口状态为 `PAUSED_CALL`。
+- Arduino IDE bundled CLI 1.5.1 / esp32 core 3.3.10、现役 `CAREROVER_DIAG_AP_ONLY=1` 与 `CAREROVER_AUDIO_GATEWAY=1` 参数在 ASCII 暂存目录完整编译 PASS：应用 1,143,982 B（36%）、全局变量 59,720 B（18%）。新应用镜像 `build/call-sonar-pause-20260929-app.bin` 为 1,144,128 B，SHA-256 `8A904FE28CFDF74A04C0177D7A61AE5A6519B68B7F73063D13515CDC85FE7C59`；与实机备份的分区表 3,072 B 逐字节一致。Node 回归：本地网页 25/25、中继 15/15、网关 2/2 PASS；独立续租 C++ 测试 PASS。
+- COM6 只读确认原主板 ESP32-S3 rev0.2、MAC `68:ee:8f:60:68:24`、16 MB Flash。更新前整片备份 `build/backups/main-before-call-sonar-pause-20260929-full.bin` 为 16,777,216 B，SHA-256 `F4EA04B6780F658F4484834A4FCC63BD202CB6451BE39E229A6A90C466CF64AB`。仅写 app0 @`0x10000`，esptool `Hash of data verified`；CAM、FFat、NVS、bootloader、分区表和手表均未写。复位后串口 `IDLE`、`estop=false`、`fault=false`、`ap=true`。
+- 服务器旧 `server.mjs` 已备份至 `/opt/carerover/backups/relay-server-before-callpause-20260929.mjs`；仅部署本次差异，服务器新文件 SHA-256 `CE720218029EEFE3DB4373029A31F434528B8A6FB92757F38EEE26E3D97F9925`。服务重启后回环 `/health` HTTP 200。Windows 音频网关重新加载，Tailscale HTTPS `/health` 直连 HTTP 200、证书验证通过；车端 `controlDevice=true`、`videoFresh=true`。
+- 12 秒无声音/运动的授权家长音频连接现场测试：主板串口从 `front_status=UNKNOWN` 变为 `PAUSED_CALL`，挂断后返回 `UNKNOWN`（45 秒内共收到 227 条前方状态）；远程视频/控制仍在线，`audioPaired=false` 为挂断后的预期值。此测试确认状态传输与固件暂停/恢复路径，不等同于示波器证明 TRIG 物理脉冲数；本轮未做真实人声噪声 A/B 或车轮落地运动验收。当前超声回波始终无效，原始 `UNKNOWN` 还需按硬件接线/摆位单独排查。

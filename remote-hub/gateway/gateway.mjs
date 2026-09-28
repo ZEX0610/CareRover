@@ -116,7 +116,16 @@ export function createGateway({ boardUrl = 'ws://192.168.4.1/ws',
       audioCloud = remote;
       remote.on('open', () => { stats.audioRelayUp = true; log('audio relay connected'); });
       remote.on('message', (data, binary) => {
-        if (!binary || !audioPacket(data)) { closeAudio(); return; }
+        if (!binary) {
+          let signal;
+          try { signal = JSON.parse(data.toString()); } catch { closeAudio(); return; }
+          if (data.length > 64 || signal?.type !== 'call_state' || typeof signal.active !== 'boolean' ||
+              Object.keys(signal).length !== 2) { closeAudio(); return; }
+          if (local.readyState === WebSocket.OPEN)
+            local.send(JSON.stringify({ type: 'call_state', active: signal.active }));
+          return;
+        }
+        if (!audioPacket(data)) { closeAudio(); return; }
         lastParentAudioAt = Date.now();
         if (local.readyState === WebSocket.OPEN && local.bufferedAmount < 65536) {
           local.send(data, { binary: true }); stats.audioDownFrames++;

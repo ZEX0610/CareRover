@@ -1,4 +1,5 @@
 #include "audio_gateway.h"
+#include "audio_call_lease.h"
 
 #if defined(CAREROVER_AUDIO_GATEWAY)
 
@@ -22,6 +23,7 @@ I2SClass mic(I2S_NUM_0), amp(I2S_NUM_1);
 QueueHandle_t uplink = nullptr, downlink = nullptr;
 httpd_handle_t httpServer = nullptr;
 std::atomic<int> audioFd{-1};
+carerover::AudioCallLease callLease;
 std::atomic<uint32_t> lastDownlinkMs{0}, captured{0}, sent{0}, played{0},
   captureDrops{0}, uplinkDrops{0}, downlinkDrops{0}, writeErrors{0};
 std::atomic<bool> publishPending{false};
@@ -152,6 +154,10 @@ bool audioGatewayBegin(httpd_handle_t server) {
          xTaskCreatePinnedToCore(senderTask, "audio_ws", 4096, nullptr, 1, nullptr, 0) == pdPASS;
 }
 
+bool audioGatewayCallActive() {
+  return audioFd.load() >= 0 && callLease.active(millis());
+}
+
 esp_err_t audioGatewayHandle(httpd_req_t* req) {
   const int fd = httpd_req_to_sockfd(req);
   if (req->method == HTTP_GET) {
@@ -161,13 +167,27 @@ esp_err_t audioGatewayHandle(httpd_req_t* req) {
     }
     xQueueReset(uplink); xQueueReset(downlink);
     lastDownlinkMs.store(0);
+    callLease.reset();
     audioFd.store(fd);
     return ESP_OK;
   }
   if (fd != audioFd.load()) return ESP_FAIL;
   httpd_ws_frame_t frame{};
-  if (httpd_ws_recv_frame(req, &frame, 0) != ESP_OK || frame.type != HTTPD_WS_TYPE_BINARY ||
-      !frame.final || frame.len != PacketBytes) return ESP_FAIL;
+  if (httpd_ws_recv_frame(req, &frame, 0) != ESP_OK || !frame.final) return ESP_FAIL;
+  if (frame.type == HTTPD_WS_TYPE_TEXT && frame.len < 64) {
+    char signal[64]{};
+    frame.payload = reinterpret_cast<uint8_t*>(signal);
+    if (httpd_ws_recv_frame(req, &frame, frame.len) != ESP_OK) return ESP_FAIL;
+    signal[frame.len] = '\0';
+    if (!strcmp(signal, "{\"type\":\"call_state\",\"active\":true}")) {
+      callLease.set(true,millis()); return ESP_OK;
+    }
+    if (!strcmp(signal, "{\"type\":\"call_state\",\"active\":false}")) {
+      callLease.reset(); return ESP_OK;
+    }
+    return ESP_FAIL;
+  }
+  if (frame.type != HTTPD_WS_TYPE_BINARY || frame.len != PacketBytes) return ESP_FAIL;
   AudioFrame packet{};
   frame.payload = packet.bytes;
   if (httpd_ws_recv_frame(req, &frame, PacketBytes) != ESP_OK || !valid(packet)) return ESP_FAIL;
@@ -179,6 +199,7 @@ esp_err_t audioGatewayHandle(httpd_req_t* req) {
 void audioGatewayClosed(int fd) {
   int expected = fd;
   if (audioFd.compare_exchange_strong(expected, -1)) {
+    callLease.reset();
     digitalWrite(AmpEnable, LOW);
     if (uplink) xQueueReset(uplink);
     if (downlink) xQueueReset(downlink);

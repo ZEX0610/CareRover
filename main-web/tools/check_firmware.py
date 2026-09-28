@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 ROOT=Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory(prefix='carerover-tests-') as d:
-    for name in ['safety','tracking','drive','front','ultrasonic','tuning','demo','demo_balanced']:
+    for name in ['safety','cliff','watch_control','call_gesture','tracking','drive','front','ultrasonic','tuning','demo','demo_balanced']:
         command=[os.environ.get('CXX','c++'),'-std=c++17','-Wall','-Wextra','-Werror','-Ifirmware/main_wireless','-Ifirmware/cam_tracking/main']
         source_name='demo' if name=='demo_balanced' else name
         if name=='demo_balanced': command+=['-DCAREROVER_TUNING_PROFILE=1']

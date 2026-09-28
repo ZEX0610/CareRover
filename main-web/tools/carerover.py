@@ -232,8 +232,11 @@ def build(args):
         raise ValueError('Tracking integration requires explicit PSRAM=opi board profile')
     tuning_profile = getattr(args, "tuning_profile", "SAFE_BASELINE")
     tuning_id = {"SAFE_BASELINE": 0, "DEMO_BALANCED": 1, "DIAGNOSTIC_RAW": 2}[tuning_profile]
+    runtime_profile = getattr(args, 'runtime_profile', 'standard')
+    extra_flags = ('-DCAREROVER_DIAG_AP_ONLY=1 -DCAREROVER_AUDIO_GATEWAY=1'
+                   if runtime_profile == 'ap-audio' else '')
     source_version = content_id(source_files + runtime_files())
-    source_version = hashlib.sha256((source_version + tuning_profile).encode()).hexdigest()[:16]
+    source_version = hashlib.sha256((source_version + tuning_profile + runtime_profile).encode()).hexdigest()[:16]
     name = f"stage{args.stage}-{integration}-{source_version}-{'check' if profile['verification']=='compile_only' else 'device'}"
     final_output = BUILD / name
     output = windows_main_build_directory(final_output)
@@ -257,7 +260,8 @@ def build(args):
     binaries = output / 'binaries'; binaries.mkdir(exist_ok=True)
     with (output / 'compile.log').open('w', encoding='utf-8') as log:
         try:
-            run([arduino, 'compile', '--fqbn', profile['fqbn'], '--library', lib,
+            run([arduino, 'compile', '--jobs', '2', '--fqbn', profile['fqbn'], '--library', lib,
+                 '--build-property', f'compiler.cpp.extra_flags={extra_flags}',
                  '--build-path', output / 'objects', '--output-dir', binaries, sketch], stdout=log, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError:
             if output != final_output and (output / 'compile.log').is_file():
@@ -279,7 +283,7 @@ def build(args):
                 'web_version': web_version, **source_info(),
                 'arduino_cli': capture([arduino,'version']).strip(), 'test_backend_only': integration_id < 2, 'integration': integration,
                 'files': {n: sha(binaries / n) for n in expected},
-                'tuning_profile': tuning_profile,
+                'tuning_profile': tuning_profile, 'runtime_profile': runtime_profile,
                 'addresses': {'main_wireless.ino.bootloader.bin': 0, 'main_wireless.ino.partitions.bin': 0x8000,
                               'boot_app0.bin': 0xe000, 'main_wireless.ino.bin': 0x10000, 'ffat.bin': PARTITION_OFFSET}}
     write_json(output / 'manifest.json', manifest)
@@ -317,6 +321,8 @@ def verify_package(package, flashing=False):
         raise ValueError('Unexpected flash file list/addresses')
     integration = manifest.get('integration', 'legacy')
     if integration not in {'legacy','observe','manual','follow'}: raise ValueError('Unknown integration backend')
+    if manifest.get('runtime_profile', 'standard') not in {'standard','ap-audio'}:
+        raise ValueError('Unknown runtime profile')
     if manifest.get('test_backend_only') != (integration in {'legacy','observe'}): raise ValueError('Inconsistent motion backend')
     for name, digest in manifest['files'].items():
         if sha(package / 'binaries' / name) != digest: raise ValueError(f'Checksum mismatch: {name}')
@@ -365,6 +371,7 @@ def main():
     b = sub.add_parser('build'); b.add_argument('--profile', required=True); b.add_argument('--stage', type=int, choices=range(1,6), default=5)
     b.add_argument('--tuning-profile', choices=['SAFE_BASELINE','DEMO_BALANCED','DIAGNOSTIC_RAW'], default='SAFE_BASELINE')
     b.add_argument('--integration', choices=['legacy','observe','manual','follow'], default='legacy')
+    b.add_argument('--runtime-profile', choices=['standard','ap-audio'], default='standard')
     v = sub.add_parser('verify'); v.add_argument('package')
     f = sub.add_parser('flash'); f.add_argument('package'); f.add_argument('--port',required=True); f.add_argument('--baud',type=int,default=460800); f.add_argument('--only',choices=['all','firmware','ffat'],default='all')
     args = p.parse_args()

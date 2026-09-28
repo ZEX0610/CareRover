@@ -1,29 +1,71 @@
-.remote-call-dialog {
-  position: fixed;
-  inset: 72px 16px auto auto;
-  margin: 0;
-  width: min(560px, calc(100vw - 24px));
-  max-height: calc(100dvh - 24px);
-  padding: 20px;
-  border: 1px solid var(--hair-strong);
-  border-radius: 20px;
-  background: var(--surface-1);
-  color: var(--text-1);
-  box-shadow: 0 30px 80px #0006;
+/* Reuse the existing video node during a call; do not open another MJPEG stream. */
+.remote-call-dialog{position:fixed;inset:0;box-sizing:border-box;width:min(960px,calc(100vw - 36px));height:min(680px,calc(100dvh - 36px));max-width:none;max-height:none;margin:auto;padding:0;overflow:hidden;border:1px solid #ffffff30;border-radius:30px;background:radial-gradient(ellipse at 10% 0%,#30414d,transparent 55%),radial-gradient(ellipse at 100% 100%,#382b40,transparent 55%),#17191e;color:#f7f8fa;box-shadow:0 35px 110px #0009,inset 0 1px #ffffff26}
+.remote-call-dialog[open]{animation:remote-call-in .38s cubic-bezier(.22,.8,.25,1) both}
+.remote-call-dialog::backdrop{background:#080a10b0;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+@keyframes remote-call-in{from{opacity:0;transform:translateY(26px) scale(.975)}to{opacity:1;transform:translateY(0) scale(1)}}
+.remote-call-dialog__head{min-height:100px;box-sizing:border-box;display:flex;align-items:center;gap:18px;padding:23px 27px 17px}
+.remote-call-dialog__identity{display:flex;align-items:center;gap:13px;min-width:0}
+.remote-call-dialog__avatar{width:48px;height:48px;flex:none;display:grid;place-items:center;border:1px solid #ffffff48;border-radius:50%;background:linear-gradient(145deg,#ffffff38,#ffffff0c);box-shadow:inset 0 1px #ffffff4a;backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}
+.remote-call-dialog__avatar svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.remote-call-dialog__identity h2{margin:0;color:#fff;font-size:23px;font-weight:650;letter-spacing:-.5px;line-height:1.2}
+.remote-call-dialog__identity #state{min-height:18px;margin:6px 0 0;color:#d0d2da;font-size:12px;line-height:1.45;overflow-wrap:anywhere}
+.remote-call-dialog__identity #state::before{content:'';display:inline-block;width:7px;height:7px;margin-right:7px;border-radius:50%;background:#a2a6b1;vertical-align:1px}
+.remote-call-dialog[data-call-phase=connecting] #state::before{background:#f6c764;box-shadow:0 0 9px #f6c76488}
+.remote-call-dialog[data-call-phase=connected] #state::before{background:#41d783;box-shadow:0 0 9px #41d78388}
+.remote-call-dialog[data-call-phase=error] #state::before{background:#ff6969}
+.remote-call-dialog__close{order:3;width:38px;height:38px;flex:none;display:grid;place-items:center;margin-left:auto;padding:0;border:1px solid #ffffff34;border-radius:50%;background:#ffffff20;color:#fff;font-size:27px;font-weight:300;line-height:1;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.remote-call-dialog__close:hover{background:#ffffff37}.remote-call-dialog__close:active{transform:scale(.94)}
+.remote-call-dialog__live{order:2;display:none;align-items:center;gap:8px;color:#d7e0dc;font-size:12px}
+.remote-call-dialog__live i{width:7px;height:7px;border-radius:50%;background:#41d783;box-shadow:0 0 10px #41d78399}
+.remote-call-dialog[data-call-phase=connected] .remote-call-dialog__live{display:flex}
+.remote-call-dialog__layout{height:calc(100% - 100px);min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 280px;align-items:center;gap:24px;padding:0 27px 27px;box-sizing:border-box}
+.remote-call-dialog__video{min-width:0;min-height:0;height:100%;display:grid;place-items:center}
+.remote-call-dialog__video .video-stage{width:100%;max-width:min(100%,calc((100dvh - 170px) * 4 / 3));height:auto;min-height:0;aspect-ratio:4/3;flex:none;border:1px solid #ffffff31;border-radius:18px;box-shadow:0 22px 55px #03050982;overflow:hidden}
+.remote-call-dialog__body{display:flex;flex-direction:column;justify-content:center;align-self:center;min-width:0;gap:18px;padding:20px;border:1px solid #ffffff2b;border-radius:25px;background:linear-gradient(145deg,#ffffff27,#ffffff10 48%,#ffffff16);box-shadow:inset 0 1px #ffffff3c;backdrop-filter:blur(28px) saturate(1.3);-webkit-backdrop-filter:blur(28px) saturate(1.3)}
+.remote-call-dialog button{font:inherit;cursor:pointer}.remote-call-dialog button:disabled{cursor:default;opacity:.45}
+.remote-call-dialog__start{display:grid;gap:14px;text-align:center}
+.remote-call-dialog__start #connect{width:100%;min-height:56px;display:flex;align-items:center;justify-content:center;gap:11px;padding:11px 18px;border:1px solid #b4f7c484;border-radius:19px;background:linear-gradient(155deg,#37d977,#1fbf5f);color:#fff;box-shadow:inset 0 1px #ffffff7c,0 9px 24px #01a94b42;font-size:16px;font-weight:650}
+.remote-call-dialog__start #connect svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8}
+.remote-call-dialog__start #connect:not(:disabled):active{transform:scale(.975)}
+.remote-call-dialog__start p,.remote-call-dialog__hint{margin:0;color:#d5d8dd;font-size:12px;line-height:1.55}
+.remote-call-dialog__active{display:none;text-align:center}
+.remote-call-dialog[data-call-phase=connected] .remote-call-dialog__start{display:none}
+.remote-call-dialog[data-call-phase=connected] .remote-call-dialog__active{display:block}
+.remote-call-dialog__controls{display:flex;justify-content:center;align-items:center;gap:25px}
+.remote-call-dialog__controls button{display:flex;align-items:center;flex-direction:column;gap:9px;min-width:86px;padding:0;border:0;background:none;color:#fff;font-size:12px;touch-action:none;-webkit-user-select:none;user-select:none}
+.remote-call-dialog__controls button svg{width:67px;height:67px;padding:19px;border:1px solid #ffffff51;border-radius:50%;background:#ffffff2b;box-shadow:inset 0 1px #ffffff54,0 6px 16px #0003;fill:none;stroke:currentColor;stroke-width:1.8;box-sizing:border-box}
+.remote-call-dialog__controls #talk svg{width:78px;height:78px;padding:22px}
+.remote-call-dialog__controls #talk:active svg,.remote-call-dialog[data-speaking=true] #talk svg{background:#29c977;border-color:#70efa7;box-shadow:inset 0 1px #ffffff79,0 0 0 8px #29c9772b}
+.remote-call-dialog__controls #disconnect svg{background:#e73e51;border-color:#ff8893;transform:rotate(135deg)}
+.remote-call-dialog__controls button:not(:disabled):active{transform:scale(.96)}
+.remote-call-dialog__hint{margin-top:16px}
+.remote-call-dialog__more{border-top:1px solid #ffffff25;padding-top:13px;color:#bfc3ce;font-size:11px}
+.remote-call-dialog__more summary{cursor:pointer;list-style:none;text-align:center}
+.remote-call-dialog__more summary::-webkit-details-marker{display:none}
+.remote-call-dialog__more summary::after{content:'⌄';padding-left:6px}
+.remote-call-dialog__more[open] summary{margin-bottom:13px}
+.remote-call-dialog__more label{display:block;margin-bottom:7px}
+.remote-call-dialog__more input{box-sizing:border-box;width:100%;min-height:42px;padding:9px 12px;border:1px solid #ffffff31;border-radius:12px;background:#0c0e1394;color:#fff;font:inherit}
+.remote-call-dialog__more #audioStats{margin:12px 0 0;line-height:1.45;overflow-wrap:anywhere}
+.remote-call-dialog[data-call-phase=connected] .remote-call-dialog__more label,.remote-call-dialog[data-call-phase=connected] .remote-call-dialog__more input{display:none}
+@media(max-width:700px){
+ .remote-call-dialog{width:100%;height:100dvh;max-height:100dvh;border:0;border-radius:0}
+ .remote-call-dialog__head{min-height:calc(72px + env(safe-area-inset-top));padding:calc(13px + env(safe-area-inset-top)) 18px 9px}
+ .remote-call-dialog__identity h2{font-size:19px}.remote-call-dialog__avatar{width:39px;height:39px}.remote-call-dialog__avatar svg{width:18px;height:18px}
+ .remote-call-dialog__live{font-size:0}
+ .remote-call-dialog__layout{height:calc(100% - 72px - env(safe-area-inset-top));display:flex;flex-direction:column;gap:0;padding:0 15px calc(16px + env(safe-area-inset-bottom))}
+ .remote-call-dialog__video{flex:1;width:100%}
+ .remote-call-dialog__video .video-stage{width:min(100%,calc((100dvh - 320px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 4 / 3));max-width:100%;border-radius:17px}
+ .remote-call-dialog__body{flex:none;width:100%;box-sizing:border-box;padding:15px 18px;border-radius:24px;gap:13px}
+ .remote-call-dialog__start #connect{min-height:53px}
+ .remote-call-dialog__controls #talk svg{width:67px;height:67px;padding:18px}.remote-call-dialog__controls button svg{width:59px;height:59px;padding:16px}
+ .remote-call-dialog__hint{margin-top:9px}.remote-call-dialog__more{padding-top:10px}
 }
-.remote-call-dialog::backdrop { background: #0009; }
-.remote-call-dialog__head { display: flex; align-items: start; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
-.remote-call-dialog h2 { font-size: 1.15rem; }
-.remote-call-dialog p { margin-top: 5px; color: var(--text-2); font-size: .84rem; }
-.remote-call-dialog__head button { padding: 8px 12px; border-radius: 9px; background: var(--surface-2); }
-.remote-call-dialog__body { display: grid; gap: 10px; }
-.remote-call-dialog__body label { font-size: .84rem; color: var(--text-2); }
-.remote-call-dialog__body input { min-width: 0; width: 100%; padding: 10px; border: 1px solid var(--hair-strong); border-radius: 9px; color: var(--text-1); background: var(--surface-sunk); }
-.remote-call-dialog__body button { padding: 10px 12px; border-radius: 9px; background: var(--surface-2); color: var(--text-1); }
-.remote-call-dialog__body button:disabled { opacity: .45; }
-.remote-call-dialog__actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.remote-call-dialog__body #talk { background: #79decd; color: #122420; touch-action: none; }
-.remote-call-dialog__body #state { min-height: 3em; overflow-wrap: anywhere; }
-@media (max-width: 600px) {
-  .remote-call-dialog { inset: auto 12px 12px 12px; width: auto; max-height: min(70dvh, 480px); overflow-y: auto; }
+@media(max-height:640px) and (max-width:700px){
+ .remote-call-dialog__head{min-height:calc(60px + env(safe-area-inset-top))}
+ .remote-call-dialog__layout{height:calc(100% - 60px - env(safe-area-inset-top));padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+ .remote-call-dialog__body{padding:10px 15px;gap:8px}
+ .remote-call-dialog__video .video-stage{width:min(100%,calc((100dvh - 265px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 4 / 3))}
+ .remote-call-dialog__start p,.remote-call-dialog__hint{font-size:10px}
 }
+@media(prefers-reduced-motion:reduce){.remote-call-dialog[open]{animation:none}}

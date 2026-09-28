@@ -49,6 +49,16 @@ Mock 额外上报 `connection.simulated: true`，用于将 WebSocket 模拟设�
 - 系统模式：`ESTOP`, `FAULT`，不可通过 set_mode 请求。
 - 状态：`IDLE`, `READY`, `DRIVING`, `TRACKING`, `SEARCHING`, `MEASURING`, `ESTOP`, `FAULT`。
 - 手势：`NONE`, `PALM`, `FIST`, `THUMB_UP`, `VICTORY`, `POINT_LEFT`, `POINT_RIGHT`, `ONE`, `TWO`, `THREE`, `FOUR`, `FIVE`, `OK`, `CALL`, `LIKE`, `DISLIKE`, `UNKNOWN`。显示置信度和更新时间；stable 且 confidence ≥ 0.75 显示“已稳定”，网页不会据此自行发运动命令。
+- `call:{"requested":boolean,"sequence":number}`：CAM 的稳定 `CALL`（拇指与小指伸出）每次重新展示会切换主板通话请求状态并递增序号。远程 HTTPS 控制台仅按新序号显示来电或挂断；来电仍需家长点击接听以授权浏览器麦克风。保持手势、遥测重发都不会重复拨号。此字段不是电机指令，也不表示家长已接听。
+
+手势去抖语义：一次有效 `CALL` 或 `FIVE` 必须先连续确认，再在画面中实际消失至少 3 帧，下一次重新展示才会再次触发。因此 `CALL → 消失 → CALL` 是取消来电请求；`FIVE → 消失 → FIVE` 是退出手表模式。仅置信度暂降、但标签仍为同一手势，不算消失。`FIVE` 只切换手表模式，不直接驱动车轮；运动仍需手表在线、归中和既有安全仲裁。
+
+## 家长照护事件（2026-09-29）
+
+局域网页从主板遥测独立计算顶部消息：CAM 在线且连续 30 秒明确未检测到人脸时显示“30 秒未识别到人脸”，仅新鲜、非预测的人脸识别结果可解除；CAM 离线不等于无人脸。前方超声有效、主板 IDLE 且状态稳定约 800 ms 时，另行提示“已离座/已入座”。通话期间超声暂停时不推断离座。局域网页没有操作系统后台通知或 APNs。
+
+服务器把相同状态转换成 `care_state` 快照和 `care_event` 实时事件。家长网页在现有 `/ws` 接收；原生 iPhone App 可独立订阅只读 `/events`，不占用遥控席位。事件 `kind` 包括 `face_absent`、`face_restored`、`seat_left`、`seat_returned`、`call_invite`、`call_cancelled`、`call_connected`、`call_ended`。`call_invite` 包含 `sound:"ring"`、`requires_confirmation:true` 和递增的 `sequence`；家长明确接听后才建立 `/audio`。认证、示例 JSON、快照恢复、前后台限制详见 [iPhone 接口说明](../../remote-hub/docs/IOS_CLIENT_API.md)。
+- `cliff.installed_mask/edge_mask`：四角位依次为左前 `1`、右前 `2`、右后 `4`、左后 `8`；OUT 高表示该角越界。当前安装掩码为 `15`，仅在手动和手表控制中拦截对应平移方向与两种旋转；跟随/自动手势运动仍不得在桌面边缘无保护运行。
 - 健康状态：`NO_FINGER`, `ACQUIRING`, `MEASURING`, `VALID`, `LOW_QUALITY`, `ERROR`。无手指、无效、低质量或过期时不显示为有效 HR / SpO₂。
 - person 500 ms 未更新隐藏；gesture 2 秒未更新失效。两个时间戳各自维护。
 
@@ -172,3 +182,9 @@ CRC8 多项式 0x07、初值 0，覆盖 `G,...` 或 `P,...`，不含 @、* 和�
 - `imu.held/warning_tilt/rejected_frames/accepted_frames`：样本保持、倾角提示与计数；拒绝样本不刷新 `age_ms` 的来源时间。
 
 详见 [0915 实现与验收边界](0915-demo-development.md)。
+
+## 通话期间超声暂停（2026-09-29）
+
+仅远程音频链路内部使用：家长 `/audio` WebSocket 连接时，中继经 Windows 网关向主板 `/audio` 发送文本帧 `{"type":"call_state","active":true}`，并每秒刷新；断开时发送 `active:false`。主板仅接受这两种精确格式，3 秒未收到刷新则自动恢复。此信号不由网页控制 WebSocket 的普通控制命令发送。
+
+主板在通话有效期间保持 HC-SR04 的 TRIG 为 LOW，不启动新测距；`front.call_paused=true`，距离失效为 null。通话断开或租约超时后恢复周期测距。此变化不设置急停，也不禁用其他安全约束；但通话期间没有新的超声波前方障碍数据，不能依赖该探头避障。四角红外防跌落逻辑不受影响。

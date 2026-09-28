@@ -169,6 +169,31 @@ test('authenticated control bridge and bounded JPEG endpoint', async () => {
   } finally { device?.terminate(); parent?.terminate(); await app.close(); }
 });
 
+test('read-only authenticated app events receive one CALL invitation and cancellation', async () => {
+  const app = await makeServer({ localOnly: true, deviceToken, parentToken });
+  const root = `ws://127.0.0.1:${app.address.port}`;
+  let device, events;
+  try {
+    const anonymous = new WebSocket(`${root}/events`);
+    await assert.rejects(once(anonymous, 'open'));
+    device = await connect(`${root}/device/ws`, { headers: { Authorization: `Bearer ${deviceToken}` } });
+    events = await connect(`${root}/events`, { headers: { Authorization: `Bearer ${parentToken}` } });
+    const received = [];
+    events.on('message', data => received.push(JSON.parse(data.toString())));
+    const send = (requested, sequence) => device.send(JSON.stringify({ type: 'telemetry',
+      connection: { camera: true }, vision: { person: { found: true, predicted: false, age_ms: 0 } },
+      robot: { mode: 'IDLE' }, front: { valid: true, seated: true }, call: { requested, sequence } }));
+    send(false, 0); send(true, 1); send(true, 1); send(false, 2);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert.deepEqual(received.filter(x => x.type === 'care_event').map(x => x.kind),
+      ['call_invite', 'call_cancelled']);
+    assert.equal(received.find(x => x.kind === 'call_invite').sound, 'ring');
+    assert.equal(received.find(x => x.kind === 'call_invite').requires_confirmation, true);
+    events.send(JSON.stringify({ type: 'cmd_vel', vx: 1 }));
+    assert.equal((await once(events, 'close'))[0], 1003);
+  } finally { device?.terminate(); events?.terminate(); await app.close(); }
+});
+
 test('tailnet HTTPS proxy keeps the backend loopback-only and accepts exact browser origin', async () => {
   const publicOrigin = 'https://care-relay.example.ts.net';
   const app = await makeServer({ proxyOrigin: publicOrigin, deviceToken, parentToken });

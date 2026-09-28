@@ -129,11 +129,16 @@ export function normalizeTelemetry(o) {
   const c = obj(o.connection);
   if (c) out.connection = { camera: bool(c.camera), main_mcu: bool(c.main_mcu), simulated: bool(c.simulated) };
 
+  const call = obj(o.call);
+  if (call && typeof call.requested === 'boolean' &&
+      Number.isSafeInteger(call.sequence) && call.sequence >= 0)
+    out.call = { requested: call.requested, sequence: call.sequence };
+
   const f = obj(o.front);
   if(f) {
     const cm=num(f.distance_cm), age=num(f.age_ms);
     const valid=f.valid===true && cm!==undefined && cm>=2 && cm<=400 && age!==undefined && age>=0 && age<220;
-    out.front={ enabled:f.enabled===true, ready:f.ready===true, valid,
+    out.front={ enabled:f.enabled===true, ready:f.ready===true, valid, call_paused:f.call_paused===true,
       distance_cm:valid?cm:null, age_ms:age!==undefined&&age>=0?age:220,
       seated:f.seated===true, release_required:f.release_required===true,
       status:enumOf(f.status,['DISABLED','UNCONFIGURED','UNKNOWN','CLEAR','WARN','SLOW','BLOCKED','STOPPED','BYPASS'])??'UNKNOWN',

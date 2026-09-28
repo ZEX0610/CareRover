@@ -32,7 +32,11 @@ test('gateway couples board telemetry and remote control, uploads live CAM frame
   const boardWs = new WebSocketServer({ server: boardHttp, path: '/ws' });
   const audioHttp = createServer();
   const audioWs = new WebSocketServer({ server: audioHttp, path: '/audio' });
-  audioWs.on('connection', (ws) => ws.on('message', (data, binary) => { if (binary) ws.send(data); }));
+  const callStates = [];
+  audioWs.on('connection', (ws) => ws.on('message', (data, binary) => {
+    if (binary) ws.send(data);
+    else callStates.push(JSON.parse(data.toString()));
+  }));
   const camHttp = createServer((req, res) => {
     assert.equal(req.url, '/stream');
     res.writeHead(200, { 'Content-Type': 'multipart/x-mixed-replace;boundary=carerover' });
@@ -63,6 +67,7 @@ test('gateway couples board telemetry and remote control, uploads live CAM frame
     gateway.start();
     await until(() => gateway.stats.boardUp && gateway.stats.relayUp &&
       gateway.stats.audioBoardUp && gateway.stats.audioRelayUp && boardPing && gateway.stats.framesUploaded >= 2);
+    await until(() => callStates.some((s) => s.type === 'call_state' && s.active === false));
     assert.equal((await (await fetch(`${root}/health`)).json()).videoFresh, true);
     const login = await fetch(`${root}/login`, { method: 'POST', redirect: 'manual',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `token=${parentToken}` });
@@ -72,9 +77,19 @@ test('gateway couples board telemetry and remote control, uploads live CAM frame
     parent.send(JSON.stringify({ type: 'set_mode', mode: 'IDLE', ts: Date.now() }));
     await until(() => boardReceived);
     assert.equal((await (await fetch(`${root}/health`)).json()).controlDevice, true);
+    let callSignal;
+    parent.on('message', (data) => {
+      const message = JSON.parse(data.toString());
+      if (message.type === 'telemetry') callSignal = message.call;
+    });
+    for (const client of boardWs.clients)
+      client.send(JSON.stringify({ type: 'telemetry', call: { requested: true, sequence: 1 } }));
+    await until(() => callSignal?.sequence === 1);
+    assert.deepEqual(callSignal, { requested: true, sequence: 1 });
     parentAudio = new WebSocket(`ws://127.0.0.1:${app.address.port}/audio`,
       ['audio-v1', `parent.${parentToken}`], { headers: { Origin: root } });
     await new Promise((resolve, reject) => { parentAudio.once('open', resolve); parentAudio.once('error', reject); });
+    await until(() => callStates.some((s) => s.type === 'call_state' && s.active === true));
     const packet = Buffer.alloc(648); packet.set([67, 82, 1, 1]);
     parentAudio.send(packet);
     await until(() => gateway.stats.audioDownFrames > 0);

@@ -5,6 +5,7 @@ import { timingSafeEqual, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { WebSocket, WebSocketServer } from 'ws';
+import { CareEventTracker, CARE_EVENT_TEXT } from './public/js/care-events.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const MAX_BUFFERED = 96 * 1024;
@@ -52,6 +53,36 @@ export async function makeServer({ deviceToken, parentToken, tlsKey, tlsCert,
     .map(async (name) => [name, await readFile(join(here, 'public', 'js', name))])));
   const counters = { deviceFrames: 0, parentFrames: 0, dropped: 0 };
   const peers = { device: null, parent: null, controlDevice: null, controlParent: null };
+  const eventClients = new Set();
+  const careEvents = new CareEventTracker();
+  let eventSequence = 0, audioPaired = false;
+  const publishEvent = (event) => {
+    const label = CARE_EVENT_TEXT[event.kind];
+    if (!label) return;
+    const payload = JSON.stringify({ type: 'care_event', event_id: `${Date.now()}-${++eventSequence}`,
+      occurred_at: new Date().toISOString(), ...event, ...label,
+      requires_confirmation: event.kind === 'call_invite', source: 'carerover-relay' });
+    for (const client of eventClients) {
+      if (client.readyState === WebSocket.OPEN && client.bufferedAmount < MAX_BUFFERED) client.send(payload);
+    }
+    if (peers.controlParent?.readyState === WebSocket.OPEN && peers.controlParent.bufferedAmount < MAX_BUFFERED)
+      peers.controlParent.send(payload);
+  };
+  const syncAudioPair = () => {
+    const paired = peers.device?.readyState === WebSocket.OPEN && peers.parent?.readyState === WebSocket.OPEN;
+    if (paired !== audioPaired) {
+      audioPaired = paired;
+      publishEvent({ kind: paired ? 'call_connected' : 'call_ended', active: paired });
+    }
+  };
+  const sendCallState = () => {
+    if (peers.device?.readyState === WebSocket.OPEN)
+      peers.device.send(JSON.stringify({ type: 'call_state', active: peers.parent?.readyState === WebSocket.OPEN }));
+    syncAudioPair();
+  };
+  // A lease on the board expires if the relay, gateway or Wi-Fi disappears.
+  const callHeartbeat = setInterval(() => { if (peers.parent) sendCallState(); }, 1000);
+  callHeartbeat.unref();
   const sessions = new Map();
   const streamClients = new Set();
   let lastJpeg = null, lastJpegAt = 0;
@@ -139,6 +170,23 @@ export async function makeServer({ deviceToken, parentToken, tlsKey, tlsCert,
 
   server.on('upgrade', (req, socket, head) => {
     const path = new URL(req.url, 'https://local.invalid').pathname;
+    if (path === '/events') {
+      const allowedOrigin = proxyOrigin ?? `${localOnly ? 'http' : 'https'}://${req.headers.host}`;
+      const browser = sessionFor(req) && req.headers.origin === allowedOrigin;
+      const app = deviceFor(req) === false && equalToken(
+        /^Bearer ([A-Za-z0-9._~-]{24,256})$/.exec(req.headers.authorization ?? '')?.[1], parentToken) && !req.headers.origin;
+      if ((!browser && !app) || eventClients.size >= 8) {
+        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n'); socket.destroy(); return;
+      }
+      eventWss.handleUpgrade(req, socket, head, (ws) => {
+        eventClients.add(ws);
+        ws.send(JSON.stringify({ ...careEvents.snapshot(), audio_paired: audioPaired,
+          updated_at: new Date().toISOString() }));
+        ws.on('message', () => ws.close(1003, 'read-only channel'));
+        ws.on('close', () => eventClients.delete(ws));
+        ws.on('error', () => {});
+      }); return;
+    }
     if (path === '/ws' || path === '/device/ws') {
       const role = path === '/ws' ? 'controlParent' : 'controlDevice';
       const allowedOrigin = proxyOrigin ?? `${localOnly ? 'http' : 'https'}://${req.headers.host}`;
@@ -148,6 +196,9 @@ export async function makeServer({ deviceToken, parentToken, tlsKey, tlsCert,
       }
       controlWss.handleUpgrade(req, socket, head, (ws) => {
         peers[role] = ws;
+        if (role === 'controlParent')
+          ws.send(JSON.stringify({ ...careEvents.snapshot(), audio_paired: audioPaired,
+            updated_at: new Date().toISOString() }));
         ws.on('message', (data, binary) => {
           if (binary || data.length > 8192) { ws.close(1003); return; }
           if (role === 'controlParent') {
@@ -159,6 +210,11 @@ export async function makeServer({ deviceToken, parentToken, tlsKey, tlsCert,
             let message;
             try { message = JSON.parse(data.toString()); } catch { ws.close(1003); return; }
             if (!['cmd_vel','set_mode','estop','clear_estop','ping'].includes(message?.type)) { ws.close(1003); return; }
+          } else {
+            let telemetry;
+            try { telemetry = JSON.parse(data.toString()); } catch { telemetry = null; }
+            if (telemetry?.type === 'telemetry')
+              for (const event of careEvents.update(telemetry)) publishEvent(event);
           }
           const other = peers[role === 'controlParent' ? 'controlDevice' : 'controlParent'];
           if (other?.readyState === WebSocket.OPEN && other.bufferedAmount < MAX_BUFFERED) other.send(data.toString());
@@ -189,6 +245,7 @@ export async function makeServer({ deviceToken, parentToken, tlsKey, tlsCert,
     }
     wss.handleUpgrade(req, socket, head, (ws) => {
       peers[role] = ws;
+      sendCallState();
       ws.on('message', (data, isBinary) => {
         if (!isBinary || !audioFrame(data)) { ws.close(1003, 'audio frame required'); return; }
         const now = Date.now();
@@ -202,18 +259,22 @@ export async function makeServer({ deviceToken, parentToken, tlsKey, tlsCert,
           other.send(data, { binary: true, compress: false });
         } else counters.dropped++;
       });
-      ws.on('close', () => { if (peers[role] === ws) peers[role] = null; });
+      ws.on('close', () => { if (peers[role] === ws) { peers[role] = null; sendCallState(); } });
       ws.on('error', () => { /* close event owns cleanup; do not log credentials */ });
     });
   });
   const controlWss = new WebSocketServer({ noServer: true, maxPayload: 8192, perMessageDeflate: false });
+  const eventWss = new WebSocketServer({ noServer: true, maxPayload: 1024, perMessageDeflate: false });
   if ((proxyOrigin || localOnly) && listenHost && listenHost !== '127.0.0.1') {
     throw new Error('Plain HTTP backend must listen on 127.0.0.1');
   }
   await new Promise((resolve) => server.listen(port, listenHost ?? (localOnly || proxyOrigin ? '127.0.0.1' : '0.0.0.0'), resolve));
   return { server, wss, counters, address: server.address(), async close() {
+    clearInterval(callHeartbeat);
     for (const peer of Object.values(peers)) peer?.terminate();
+    for (const client of eventClients) client.terminate();
     for (const res of streamClients) res.destroy();
+    await new Promise((resolve) => eventWss.close(resolve));
     await new Promise((resolve) => controlWss.close(resolve));
     await new Promise((resolve) => wss.close(resolve));
     await new Promise((resolve) => server.close(resolve));

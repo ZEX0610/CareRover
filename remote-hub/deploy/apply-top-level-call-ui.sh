@@ -7,7 +7,8 @@ root=/opt/carerover/remote-hub/relay
 node=/opt/node-v24.21.0-linux-x64/bin/node
 service=carerover-remote-hub.service
 backup_dir=/opt/carerover/backups
-files=(public/client.js public/console.html public/css/remote.css public/index.html public/js/app.js public/style.css)
+files=(public/client.js public/console.html public/css/remote.css public/index.html public/js/app.js public/js/config.js public/js/i18n.js public/js/protocol.js public/style.css)
+new_files=(public/js/call-signal.js)
 
 actual_sha256=$(sha256sum "$archive" | cut -d ' ' -f 1)
 if [[ "$actual_sha256" != "$expected_sha256" ]]; then
@@ -15,15 +16,21 @@ if [[ "$actual_sha256" != "$expected_sha256" ]]; then
   exit 1
 fi
 stage=$(mktemp -d /tmp/carerover-call-ui-XXXXXXXX)
+trap 'rm -rf -- "$stage"' EXIT
 tar -xf "$archive" -C "$stage"
 for path in "${files[@]}"; do test -f "$stage/$path"; done
+for path in "${new_files[@]}"; do test -f "$stage/$path"; done
 "$node" --check "$stage/public/client.js"
 "$node" --check "$stage/public/js/app.js"
+"$node" --check "$stage/public/js/call-signal.js"
 
 install -d -m 0750 "$backup_dir"
 backup="$backup_dir/relay-before-top-level-call-$(date -u +%Y%m%dT%H%M%SZ).tar"
 tar -cf "$backup" -C "$root" "${files[@]}"
 for path in "${files[@]}"; do
+  install -o carerover -g carerover -m 0644 "$stage/$path" "$root/$path"
+done
+for path in "${new_files[@]}"; do
   install -o carerover -g carerover -m 0644 "$stage/$path" "$root/$path"
 done
 systemctl restart "$service"

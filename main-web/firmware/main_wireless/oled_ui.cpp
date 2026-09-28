@@ -182,15 +182,17 @@ void OledUi::renderData(const OledUiSnapshot &snapshot) {
   else strcpy(value, "--");
   drawText(18, 12, value, 2);
   drawText(58, 18, "BPM");
+  drawText(90, 18, snapshot.wristHealthSource ? "W" : "C");
 
   drawText(0, 37, "O2");
   if (snapshot.spo2Valid) snprintf(value, sizeof(value), "%ld", static_cast<long>(snapshot.spo2Percent));
   else strcpy(value, "--");
   drawText(18, 34, value, 2);
   drawText(58, 40, "%");
+  drawText(90, 40, snapshot.wristHealthSource ? "W" : "C");
 
-  if(snapshot.heartRateValid&&snapshot.heartRateHeld)drawText(108,18,"~");
-  if(snapshot.spo2Valid&&snapshot.spo2Held)drawText(108,40,"~");
+  if(snapshot.heartRateValid&&snapshot.heartRateHeld)drawText(108,18,"H");
+  if(snapshot.spo2Valid&&snapshot.spo2Held)drawText(108,40,"H");
   // Front distance on the same page.
   drawHorizontalLine(50);
   if(snapshot.frontEnabled) {
@@ -226,7 +228,8 @@ void OledUi::service(uint32_t nowMs, const OledUiSnapshot &snapshot) {
     return;
   }
 
-  const bool hasResult = snapshot.gestureValid || snapshot.heartRateValid || snapshot.spo2Valid;
+  const bool hasResult = snapshot.gestureValid || snapshot.heartRateValid ||
+                         snapshot.spo2Valid || snapshot.wristHealthSource;
   if (hasResult) {
     noResultSinceMs_ = 0;
     idleActive_ = false;

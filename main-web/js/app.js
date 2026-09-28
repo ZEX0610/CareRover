@@ -9,12 +9,15 @@ import { VideoPanel } from './video.js';
 import { createFrontPanel } from './front-panel.js';
 import { DebugPanel } from './debug.js';
 import { initWorkspace } from './workspace.js';
+import { CareEventTracker } from './care-events.js';
+import { CareBanners } from './care-banners.js';
 
 const $ = id => document.getElementById(id);
 const state = store.getState();
 const lifecycle = new AbortController();
 const sourceKind = new URLSearchParams(location.search).get('source');
-let transport, controls, debug, video, chart;
+let transport, controls, debug, video, chart, banners;
+const careEvents = new CareEventTracker();
 let pendingMode = null, pendingClear = null, pong = null, replay = null;
 let raf, lastPaint = 0, frames = 0, fps = 0, frameEpoch = performance.now(), lastUi = 0;
 let zeroRepeats = 0, lastCommand = 0, previousEnabled = false, previousLink = LINK.DISCONNECTED;
@@ -81,6 +84,8 @@ function receive(raw, isReplay = false) {
   switch (msg.type) {
     case 'telemetry':
       store.applyTelemetry(msg);
+      if (!isReplay && !state.ui.replaying)
+        for (const kind of careEvents.update(msg)) banners?.message(kind);
       if (msg.video?.stream_url) video?.setStreamUrl(msg.video.stream_url);
       if (pendingMode && msg.robot?.mode === pendingMode.command.mode && msg.robot.estop === false) {
         toast(t('t.mode.ok', { mode: t(`mode.${msg.robot.mode}`) })); pendingMode = null;
@@ -243,6 +248,7 @@ function tick(now) {
 }
 async function main() {
   initLang();
+  banners = new CareBanners();
   debug = new DebugPanel({ replay: startReplay, resume: resumeLive });
   controls = new MotionInput({ pad: $('joystick'), knob: $('joystickKnob'), left: $('rotL'), right: $('rotR'), stop: $('btnStop'), enabled: manual, emergency,
     change: (v, immediate) => {
@@ -285,6 +291,7 @@ async function main() {
   window.addEventListener('pageshow', e => { if (e.persisted && !state.ui.replaying) transport.connect(); }, { signal: lifecycle.signal });
   function destroy() {
     destroyed = true; cancelAnimationFrame(raf); timers.forEach(clearInterval); controls.destroy(); video.destroy(); debug.destroy();
+    banners.destroy();
     offMessage(); offState(); transport.disconnect(); lifecycle.abort();
   }
   transport.connect(); raf = requestAnimationFrame(tick);

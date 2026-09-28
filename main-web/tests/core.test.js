@@ -46,6 +46,12 @@ test('protocol rejects malformed frames, unsafe commands, bad samples and ACKs',
   assert.equal(p.decode(JSON.stringify({type:'ppg_batch',samples:Array(2000).fill(3)})).msg.samples.length,512);
   assert.equal(p.decode('{"type":"telemetry","vision":{"image_width":0}}').msg.vision.image_width,undefined);
 });
+test('watch mode is displayed from telemetry but cannot be requested by the web client', () => {
+  const decoded=p.decode(JSON.stringify(telemetry({mode:'WATCH_CONTROL',state:'READY'})));
+  assert.equal(decoded.ok,true);
+  assert.equal(decoded.msg.robot.mode,'WATCH_CONTROL');
+  assert.ok(p.validateOutgoing({type:'set_mode',ts:1,mode:'WATCH_CONTROL'}));
+});
 test('manual control requires fresh robot confirmation, healthy links, and no safety latch', () => {
   const state=s.getState(); s.setConnectionState('connected'); s.applyTelemetry(telemetry());
   state.ui.replaying=false; s.markEstopLocal(false); s.setRequestedMode(null);

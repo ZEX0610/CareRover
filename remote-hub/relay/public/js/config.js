@@ -51,7 +51,7 @@ export const CONFIG = {
 export const MODES = ['IDLE', 'MANUAL', 'PERSON_FOLLOW', 'GESTURE_CONTROL', 'HEALTH_CHECK'];
 
 /** 机器人可能上报、但网页不能主动请求的模式。 */
-export const SYSTEM_MODES = ['ESTOP', 'FAULT'];
+export const SYSTEM_MODES = ['ESTOP', 'FAULT', 'WATCH_CONTROL'];
 
 /** 手势枚举，必须与 CAM 端 ESP-DL 输出保持一致。 */
 export const GESTURES = [

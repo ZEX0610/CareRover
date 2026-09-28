@@ -12,7 +12,14 @@ class Hcsr04 {
     trig_=i.trig;echo_=i.echo;pinMode(trig_,OUTPUT);digitalWrite(trig_,LOW);pinMode(echo_,INPUT);
     attachInterruptArg(echo_,edge,this,CHANGE);return true;
   }
+  void pause() {
+    if(trig_>=0)digitalWrite(trig_,LOW);
+    portENTER_CRITICAL(&mux_);armed_=false;risen_=false;done_=false;portEXIT_CRITICAL(&mux_);
+    pending_=false;started_=false;paused_=true;
+  }
+  void resume() { pending_=false;started_=false;paused_=false; }
   bool service(uint32_t nowUs,double& cm,bool& valid) {
+    if(paused_)return false;
     bool completed=false;uint32_t width=0;
     portENTER_CRITICAL(&mux_);
     if(done_) { width=width_;done_=false;armed_=false;completed=true; }
@@ -41,7 +48,7 @@ class Hcsr04 {
     portEXIT_CRITICAL_ISR(&self->mux_);
   }
   portMUX_TYPE mux_=portMUX_INITIALIZER_UNLOCKED;
-  int trig_=-1,echo_=-1;bool pending_=false,started_=false;
+  int trig_=-1,echo_=-1;bool pending_=false,started_=false,paused_=false;
   volatile bool armed_=false,risen_=false,done_=false;
   volatile uint32_t riseUs_=0,width_=0;uint32_t startUs_=0;
 };

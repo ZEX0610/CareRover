@@ -189,3 +189,15 @@
 - iPhone182 的 R5 顶层页面能听到小车，但第一轮按住后车端无声，服务器只计 `parentFrames=22`（约 0.44 秒），与 5 秒按住不符。针对触摸保持加入 `touchstart`/`touchend` 分支和可见的采集/发送帧数，旧版测试红，新版 relay 10/10 绿。精确备份六文件到 `/opt/carerover/backups/relay-before-top-level-call-20260927T072323Z.tar`，上传包 SHA-256 `896ddfc2c31c61c42fe5aa17b73db4fb2cf95cc42e68be664b3cd4cb9bac257f`，服务、视频及车端控制恢复。
 - 第二轮服务器 `parentFrames` 从 0 增至 184、再至 498；车旁 Windows 网关下行转发 `audioDownFrames` 从 273 增至 771。用户确认按住手机说话时小车扬声器有声，松开后手机也能听到小车麦克风。**异设备双向路径已接通**；仍需交替短句音质、回声与视频/遥测并行验收。当前为私有 Tailscale HTTPS，并非公网免登录网页。
 - 用户随后完成约 20 秒的手机与小车交替说话，反馈“两端清楚，视频数据正常”。当前短时异设备半双工远程通话、视频及遥测并行现场通过。未验证长时间运行、掉线重连及远程运动；车旁 Windows 双网络网关需持续开机运行，家长 iPhone182 需加入同一 Tailscale 网络。主板仍为 AP-only 音频应用，微信通知暂停。
+
+## 2026-09-28 CALL 手势网页信令
+
+- 远程 R5 首页已加入主板 `call.requested/sequence` 的去重监听。CAM 模型静态类别清单含 `call`；主板稳定识别后第一次发出邀请、再次展示发出挂断。邀请打开现有顶层通话弹窗，但家长须主动点击接听以满足 iPhone 浏览器麦克风授权；挂断关闭弹窗并触发原通话清理。无页面打开时不发送后台推送。
+- 新 CALL 文件部署前已备份服务器旧 UI `/opt/carerover/backups/relay-before-top-level-call-20260928T145502Z.tar`；中继 14/14、网关 2/2、本地网页 25/25 测试 PASS。部署后服务及回环 `/health` 正常。主板 app 与 FFat 已完成哈希校验烧录，网关重新连上控制/音频链路；当时 CAM `192.168.4.2` 超时，所以远程视频 `videoFresh=false`。真实 iPhone 来电/挂断尚未验收，不宣称整套通话手势已完成。
+- 用户已澄清 CAM 和四个红外模块此刻都未实际接线；远程无视频、CAM 手势无法产生 CALL 是硬件未接状态，不是远程部署通过后的完整现场验收。四路输入未接时主板上拉为 HIGH 并保持运动拦截。必须待接线后复测，勿在此状态给舵机上电。
+
+## 2026-09-29 通话状态驱动超声暂停
+
+- Windows Chrome 经代理访问私有 `tail86bfa5.ts.net` 报 `ERR_CONNECTION_CLOSED`；同机不经代理的 `curl` 访问 `https://carerover-relay.tail86bfa5.ts.net/health` 为 HTTP 200、TLS 验证通过。局域网页无视频是另一问题：CAM `/stream` 曾返回 `503 Video viewer busy`，其单观看连接被持久在线 Windows 网关占用；车旁电脑宜在同一 Tailscale 网络中使用无代理浏览器打开私有远程控制台，不能把代理错误归咎于 CAM。
+- 新版 relay 在家长 `/audio` 连接/断开时发送 `call_state`，通话持续每秒续租；Windows gateway 严格校验并转发到主板音频 WebSocket。中继 15/15、网关 2/2 测试 PASS。部署前服务器旧 `server.mjs` 已备份于 `/opt/carerover/backups/relay-server-before-callpause-20260929.mjs`；新文件 SHA-256 `CE720218029EEFE3DB4373029A31F434528B8A6FB92757F38EEE26E3D97F9925`，服务重启后回环健康检查 200。Windows 网关进程按原音频启动脚本重新加载。
+- 主板应用更新及完整 Flash 备份详见 `main-web/docs/windows-progress.md`。服务器发起 12 秒无音频模拟家长通话，主板串口确认 `PAUSED_CALL`，挂断后恢复普通状态；闭环完成后 `controlDevice=true`、`videoFresh=true`，私有 HTTPS `/health` HTTP 200。未进行手机/真实人声的超声噪声对照，不能宣称噪声主观改善已验收。通话时前方超声测距停用，其他安全约束仍生效。

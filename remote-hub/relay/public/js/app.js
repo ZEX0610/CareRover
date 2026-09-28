@@ -9,12 +9,13 @@ import { VideoPanel } from './video.js';
 import { createFrontPanel } from './front-panel.js';
 import { DebugPanel } from './debug.js';
 import { initWorkspace } from './workspace.js';
+import { CareBanners } from './care-banners.js';
 
 const $ = id => document.getElementById(id);
 const state = store.getState();
 const lifecycle = new AbortController();
 const sourceKind = new URLSearchParams(location.search).get('source');
-let transport, controls, debug, video, chart;
+let transport, controls, debug, video, chart, banners;
 let pendingMode = null, pendingClear = null, pong = null, replay = null;
 let raf, lastPaint = 0, frames = 0, fps = 0, frameEpoch = performance.now(), lastUi = 0;
 let zeroRepeats = 0, lastCommand = 0, previousEnabled = false, previousLink = LINK.DISCONNECTED;
@@ -90,6 +91,20 @@ function receive(raw, isReplay = false) {
         store.markEstopLocal(false); pendingClear = null; toast(t('t.estop.clear'), 'ok');
       }
       if (!manual() && previousEnabled) stop();
+      break;
+    case 'care_state':
+      if (!isReplay && !state.ui.replaying) banners?.snapshot(msg);
+      break;
+    case 'care_event':
+      if (!isReplay && !state.ui.replaying) {
+        banners?.message(msg.kind, msg.active);
+        if (msg.kind === 'call_invite') {
+          if ($('remoteCallDialog').dataset.callPhase !== 'connected')
+            text('state', tr('孩子请求通话，请确认接听', 'The child is calling. Confirm to answer.'));
+        } else if (msg.kind === 'call_cancelled') {
+          if ($('remoteCallDialog').open) $('remoteCallDialog').close();
+        }
+      }
       break;
     case 'ppg_batch': store.appendPpgSamples(msg.samples, msg.sample_rate_hz, Date.now()); break;
     case 'ppg': store.appendPpgSamples([msg.value], state.ppg.sampleRateHz, Date.now()); break;
@@ -244,6 +259,10 @@ function tick(now) {
 }
 async function main() {
   initLang();
+  banners = new CareBanners({ language: getLang, answer: () => {
+    if (!$('remoteCallDialog').open) $('callBtn').click();
+    $('connect').click();
+  } });
   debug = new DebugPanel({ replay: startReplay, resume: resumeLive });
   controls = new MotionInput({ pad: $('joystick'), knob: $('joystickKnob'), left: $('rotL'), right: $('rotR'), stop: $('btnStop'), enabled: manual, emergency,
     change: (v, immediate) => {
@@ -258,13 +277,20 @@ async function main() {
   const on = (id, event, fn) => $(id).addEventListener(event, fn, { signal: lifecycle.signal });
   initWorkspace({ beforeViewChange: stop, signal: lifecycle.signal });
   on('sidebarModes', 'click', e => { const button = e.target.closest('[data-mode]'); if (button) changeMode(button.dataset.mode); });
+  const callVideoStage = $('videoStage');
+  const callVideoParent = callVideoStage.parentNode;
+  const callVideoNext = callVideoStage.nextSibling;
   on('callBtn', 'click', () => {
     const dialog = $('remoteCallDialog');
     if (dialog.open) return;
-    dialog.show();
+    dialog.showModal();
+    $('remoteCallVideoSlot').append(callVideoStage);
+    $('connect').focus({ preventScroll: true });
   });
   on('remoteCallClose', 'click', () => $('remoteCallDialog').close());
+  on('connect', 'click', () => banners.stopRing());
   $('remoteCallDialog').addEventListener('close', () => {
+    callVideoParent.insertBefore(callVideoStage, callVideoNext);
     window.dispatchEvent(new Event('carerover-call-close'));
   }, { signal: lifecycle.signal });
   on('estopBtn', 'click', emergency); on('clearEstopBtn', 'click', requestClear);
@@ -294,6 +320,7 @@ async function main() {
   window.addEventListener('pageshow', e => { if (e.persisted && !state.ui.replaying) transport.connect(); }, { signal: lifecycle.signal });
   function destroy() {
     destroyed = true; cancelAnimationFrame(raf); timers.forEach(clearInterval); controls.destroy(); video.destroy(); debug.destroy();
+    banners.destroy();
     offMessage(); offState(); transport.disconnect(); lifecycle.abort();
   }
   transport.connect(); raf = requestAnimationFrame(tick);

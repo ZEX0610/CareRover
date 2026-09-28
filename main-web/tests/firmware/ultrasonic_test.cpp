@@ -17,5 +17,12 @@ int main(){
   Hcsr04 wrapped;assert(wrapped.begin(install));assert(!wrapped.service(0xfffff000U,cm,valid));
   echoEdge(15,HIGH,0xfffff100U);echoEdge(15,LOW,uint32_t(0xfffff100U+5800));
   assert(wrapped.service(uint32_t(0xfffff100U+5900),cm,valid)&&valid&&cm==100);
+  const int pulsesBeforePause=highPulses;
+  wrapped.pause();
+  assert(levels[14]==LOW);
+  echoEdge(15,HIGH,100);echoEdge(15,LOW,5900);
+  assert(!wrapped.service(100000,cm,valid)&&highPulses==pulsesBeforePause);
+  wrapped.resume();
+  assert(!wrapped.service(101000,cm,valid)&&highPulses==pulsesBeforePause+1);
   std::cout<<"HC-SR04 driver: pulse spacing, edge capture, timeout, stuck high, invalid pulse and timer wrap passed\n";
 }

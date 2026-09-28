@@ -28,11 +28,32 @@
 | `/call` | GET HTML | 会话 Cookie；双向通话页面。 |
 | `/stream` | GET `multipart/x-mixed-replace; boundary=frame` | 会话 Cookie；每 part 为 `Content-Type: image/jpeg` + `Content-Length` + JPEG。320×240 源图，远程实际 FPS 以现场网络为准。 |
 | `/ws` | WSS 文本 JSON | 会话 Cookie + 精确 `Origin: https://carerover-relay.tail86bfa5.ts.net`；接收主板遥测、发送控制。当前只允许一位家长控制连接，设备离线时拒绝升级。 |
+| `/events` | WSS 文本 JSON，只读 | 原生 App 用 `Authorization: Bearer <AUDIO_PARENT_TOKEN>` 且**不发送 Origin**；网页登录页可用会话 Cookie + 精确 HTTPS Origin。可与网页控制连接并存，最多 8 位订阅者。不得向此连接发送指令。 |
 | `/audio` | WSS 二进制 | 已登录家长可用 `cr_session` Cookie + 子协议 `audio-v1` + 精确 `Origin`；也兼容 `audio-v1` 与 `parent.<家长令牌>` 的旧方式。家长音频只能一条。设备仍使用独立 Bearer 令牌。 |
 | `/css/*`, `/js/*`, `/client.js`, `/capture-worklet.js` | GET 静态文件 | 会话 Cookie；给现有网页使用。 |
 | `/device/ws`, `/device/frame` | WS / POST | **设备侧** Bearer 令牌接口。App 不调用、不保存设备令牌。 |
 
 原生 Swift 网络栈不会必然自动带浏览器式 `Origin`。接入 `/ws`、`/audio` 时必须按当前服务器要求设置准确 Origin；HTTP Cookie 也须从 `/login` 响应正确保存并随 `/ws`、`/audio`、`/stream` 发送。这一原生握手路径尚未在实机 App 验收，建议先通过 WebView 验证，然后添加自动化握手测试。服务器不提供通用注册/刷新令牌、REST 运动指令或 WebRTC 信令。
+
+### App 顶部提醒与来电铃声（2026-09-29 新增契约）
+
+原生 App 另开一条只读 `wss://carerover-relay.tail86bfa5.ts.net/events`，在 WebSocket 握手中设置 `Authorization: Bearer <AUDIO_PARENT_TOKEN>`，不要把令牌放 URL、子协议、日志或仓库。`/events` 不占用唯一的 `/ws` 控制席位；设备暂时离线时仍可连接，但历史事件**不持久化**。连接成功先收到一次 `care_state` 快照，随后按发生顺序接收 `care_event`：
+
+```json
+{"type":"care_state","camera_online":true,"face_alert_active":false,"seat":"seated","call_requested":false,"call_sequence":4,"audio_paired":false,"updated_at":"2026-09-29T08:00:00.000Z"}
+{"type":"care_event","event_id":"1790668800000-5","occurred_at":"2026-09-29T08:00:00.000Z","kind":"face_absent","active":true,"title":"30 秒未识别到人脸","body":"请查看实时画面确认孩子情况。","sound":"none","requires_confirmation":false,"source":"carerover-relay"}
+{"type":"care_event","event_id":"1790668810000-6","occurred_at":"2026-09-29T08:00:10.000Z","kind":"face_restored","active":false,"title":"重新识别到人脸","body":"无人脸提醒已解除。","sound":"none","requires_confirmation":false,"source":"carerover-relay"}
+{"type":"care_event","event_id":"1790668820000-7","occurred_at":"2026-09-29T08:00:20.000Z","kind":"seat_left","active":true,"title":"离座提醒","body":"前方距离变化提示可能离座，请查看画面确认。","sound":"none","requires_confirmation":false,"source":"carerover-relay"}
+{"type":"care_event","event_id":"1790668830000-8","occurred_at":"2026-09-29T08:00:30.000Z","kind":"call_invite","active":true,"sequence":5,"title":"孩子请求通话","body":"请确认是否接听。","sound":"ring","requires_confirmation":true,"source":"carerover-relay"}
+```
+
+`kind` 完整集合：`face_absent` / `face_restored`、`seat_left` / `seat_returned`、`call_invite` / `call_cancelled`、`call_connected` / `call_ended`。App 用 `event_id` 去重；用 `kind` 和 `active` 驱动顶部条，不依赖可翻译的 `title` 做判断。`face_absent` 顶部条保持到 `face_restored`；`seat_left` 顶部条保持到 `seat_returned`，入座消息短暂显示；`call_invite` 顶部条带“接听”按钮并循环播放本机铃声，直到用户点接听、收到 `call_cancelled` 或 `call_connected`。点“接听”后按第 5 节建立 `/audio`；`call_connected` 只表示两端音频 WebSocket 已配对，不等于麦克风权限或音质已通过。`call_cancelled` 表示再次有效的 CALL 手势取消请求；`call_ended` 表示一端音频断开，两者不能混淆。
+
+CALL 和 FIVE 都必须先被稳定识别，然后手势离开/不再分类为该手势，再次稳定识别才会触发第二次；持续保持或同一手势短暂低置信度不会连发。CALL 第一次为请求，第二次为取消；FIVE 第一次进入手表模式，第二次退出。每个 CALL 请求有递增 `sequence`；同一序号的遥测重发不能重复响铃。
+
+无人脸提醒的含义只是“CAM 在线并持续 30 秒未检测到新的人脸”，**不是儿童身份识别或离座证明**。CAM 离线时不启动 30 秒计时，也不会假称重新识别；已产生的提醒保留到真实人脸再次出现。离座/入座来自 IDLE 时有效的前方超声测距，稳定约 800 ms 后上报；通话期间超声暂停时不产生新离座判断。App 应将两种提醒分开展示。`care_state.seat="unknown"` 表示尚无可靠基线。
+
+这个接口是**已连接 App 的实时事件流**，不是 APNs。App 在后台、被系统挂起、断网或未启动时，服务器目前不能保证弹窗或铃声；若要离线推送，需要另行建设 APNs 设备令牌、推送凭据、队列及隐私/权限流程。重连时用 `care_state` 恢复当前持续状态，不把它误当新的离座事件；若 `call_requested=true` 且 `audio_paired=false`，可恢复未接来电提示。Xcode 项目在另一台 Mac，仓库未包含 App 源码，故 App 的界面、本机铃声和通知权限仍须由 App 开发者接入验收。
 
 ## 4. 控制与遥测
 
@@ -47,7 +68,7 @@
 
 `vx` 正=前、`vy` 正=右、`wz` 正=顺时针，三项均在 [-1,1]。摇杆只是目标量，不代表已实测车速；四轮 PWM 由主板安全仲裁和布局代码负责。非零手动命令只在主板确认 MANUAL、持有控制权、链路/IMU/前方条件满足时有效。运行中推荐约 20 Hz 续发目标；松手、页面退后台、网络断开或模式变化时立刻发零速度，主板仍有约 240 ms 输出租约作为兜底。请求模式不等于模式已切换，必须等待 ACK 和新鲜 telemetry。急停优先，不能用摇杆解除。
 
-从 `/ws` 接收的类型为 `telemetry`、`ppg`、`ppg_batch`、`ack`、`error`、`pong`。重要字段示意（**只示结构，不是实测值**）：
+从 `/ws` 接收的类型为 `telemetry`、`ppg`、`ppg_batch`、`ack`、`error`、`pong`，网页还会收到 `care_state` / `care_event`。重要字段示意（**只示结构，不是实测值**）：
 
 ```json
 {

@@ -7,7 +7,7 @@
 
 namespace carerover {
 
-enum class GestureAction { None, StartFollow, Stop, TurnClockwise, TurnCounterClockwise };
+enum class GestureAction { None, StartFollow, Stop, TurnClockwise, TurnCounterClockwise, ToggleWatch, ToggleCall };
 
 inline bool gestureActionBoxValid(const char* label, int x0, int y0, int x1, int y1) {
   constexpr int kMinActionBoxWidth = 80;
@@ -31,17 +31,19 @@ class GestureActionLatch {
 
   GestureAction update(bool accepted, const char* label, uint64_t now=0) {
     if(windowed_) return updateWindow(accepted,label,now);
-    if (!accepted || !label || !label[0]) {
-      candidate_[0] = '\0';
-      candidateFrames_ = 0;
-      if (active_[0] && releasedFrames_ < UINT8_MAX) ++releasedFrames_;
-      if (releasedFrames_ >= releaseFrames_) active_[0] = '\0';
-      return GestureAction::None;
-    }
     char normalized[16] = {};
     size_t i = 0;
-    for (; label[i] && i + 1 < sizeof(normalized); ++i) {
+    if (label) for (; label[i] && i + 1 < sizeof(normalized); ++i)
       normalized[i] = static_cast<char>(std::toupper(static_cast<unsigned char>(label[i])));
+    if (!accepted || !normalized[0]) {
+      candidate_[0] = '\0';
+      candidateFrames_ = 0;
+      // A low-confidence frame still labelled as the held gesture is not a
+      // release. Require the gesture to actually disappear before rearming.
+      if (active_[0] && std::strcmp(active_, normalized) && releasedFrames_ < UINT8_MAX) ++releasedFrames_;
+      else if (!std::strcmp(active_, normalized)) releasedFrames_ = 0;
+      if (releasedFrames_ >= releaseFrames_) active_[0] = '\0';
+      return GestureAction::None;
     }
     releasedFrames_ = 0;
     if (!std::strcmp(active_, normalized)) {
@@ -69,6 +71,8 @@ class GestureActionLatch {
     if (!std::strcmp(normalized, "TWO")) return GestureAction::TurnClockwise;
     if (!std::strcmp(normalized, "THREE")) return GestureAction::TurnCounterClockwise;
     if (!std::strcmp(normalized, "OK")) return GestureAction::TurnCounterClockwise;
+    if (!std::strcmp(normalized, "FIVE")) return GestureAction::ToggleWatch;
+    if (!std::strcmp(normalized, "CALL")) return GestureAction::ToggleCall;
     return GestureAction::None;
   }
 
@@ -78,7 +82,7 @@ class GestureActionLatch {
     if(label)for(size_t i=0;label[i]&&i<15;++i)normalized[i]=static_cast<char>(std::toupper(static_cast<unsigned char>(label[i])));
     for(int i=4;i>0;--i)votes_[i]=votes_[i-1];
     votes_[0]={};if(accepted){std::strcpy(votes_[0].label,normalized);votes_[0].ms=now;}
-    if(!accepted || std::strcmp(active_,normalized)) {if(releasedFrames_<255)++releasedFrames_;if(releasedFrames_>=releaseFrames_)active_[0]=0;}
+    if(std::strcmp(active_,normalized)) {if(releasedFrames_<255)++releasedFrames_;if(releasedFrames_>=releaseFrames_)active_[0]=0;}
     else releasedFrames_=0;
     if(!accepted||!normalized[0]||!std::strcmp(active_,normalized))return GestureAction::None;
     const bool stop=!std::strcmp(normalized,"DISLIKE"),like=!std::strcmp(normalized,"LIKE");
@@ -91,6 +95,8 @@ class GestureActionLatch {
     if(!std::strcmp(normalized,"TWO"))return GestureAction::TurnClockwise;
     if(!std::strcmp(normalized,"THREE"))return GestureAction::TurnCounterClockwise;
     if(!std::strcmp(normalized,"OK"))return GestureAction::TurnCounterClockwise;
+    if(!std::strcmp(normalized,"FIVE"))return GestureAction::ToggleWatch;
+    if(!std::strcmp(normalized,"CALL"))return GestureAction::ToggleCall;
     return GestureAction::None;
   }
   struct Vote {char label[16]={};uint64_t ms=0;}votes_[5];

@@ -7,6 +7,8 @@
 #include "hcsr04.h"
 #include "seat_notification_gate.h"
 #include "serverchan_notify.h"
+#include "watch_link.h"
+#include "cliff_config.h"
 #include "audio_gateway.h"
 #include <Arduino.h>
 #include <WiFi.h>
@@ -74,6 +76,8 @@ struct Sources {
   bool accepted = false;
   bool displayAccepted = false;
   uint32_t inferMs = 0, gestureSeq = 0, healthSeq = 0, ppgSeq = 0;
+  bool callRequested = false;
+  uint32_t callSeq = 0;
   uint64_t gestureMs = 0, displayGestureMs = 0, ppgMs = 0;
   uint32_t ppg[5] = {};
 } sources;
@@ -306,21 +310,57 @@ void publish(void*) {
     auto* front=cJSON_AddObjectToObject(j,"front");
     cJSON_AddBoolToObject(front,"enabled",state.front.enabled);cJSON_AddBoolToObject(front,"ready",state.front.ready);
     cJSON_AddBoolToObject(front,"valid",state.front.valid);
+    cJSON_AddBoolToObject(front,"call_paused",audioGatewayCallActive());
     if(state.front.valid)cJSON_AddNumberToObject(front,"distance_cm",state.front.distanceCm);else cJSON_AddNullToObject(front,"distance_cm");
     cJSON_AddNumberToObject(front,"age_ms",double(state.front.ageMs));
     cJSON_AddStringToObject(front,"status",state.front.status);cJSON_AddStringToObject(front,"phase",phaseName(state.front.phase));
     cJSON_AddBoolToObject(front,"seated",state.seated);
     cJSON_AddBoolToObject(front,"release_required",state.front.held);
     cJSON_AddStringToObject(front,"stop_reason",state.stopReason);
+    auto* cliff=cJSON_AddObjectToObject(j,"cliff");
+    cJSON_AddBoolToObject(cliff,"sampled",state.cliff.sampled);
+    cJSON_AddNumberToObject(cliff,"installed_mask",state.cliff.installedMask);
+    cJSON_AddNumberToObject(cliff,"edge_mask",state.cliff.edgeMask);
+    cJSON_AddBoolToObject(cliff,"front_left",(state.cliff.edgeMask & CliffFrontLeft)!=0);
+    cJSON_AddBoolToObject(cliff,"front_right",(state.cliff.edgeMask & CliffFrontRight)!=0);
+    cJSON_AddBoolToObject(cliff,"rear_right",(state.cliff.edgeMask & CliffRearRight)!=0);
+    cJSON_AddBoolToObject(cliff,"rear_left",(state.cliff.edgeMask & CliffRearLeft)!=0);
+    auto* call=cJSON_AddObjectToObject(j,"call");
+    cJSON_AddBoolToObject(call,"requested",source.callRequested);
+    cJSON_AddNumberToObject(call,"sequence",source.callSeq);
     auto* robot=cJSON_AddObjectToObject(j,"robot");
     const char* mode=state.estop?"ESTOP":state.fault?"FAULT":modeName(state.mode);
     cJSON_AddStringToObject(robot,"mode",mode);
-    cJSON_AddStringToObject(robot,"state",state.estop?"ESTOP":state.fault?"FAULT":state.mode==Mode::Manual?(state.target.vx||state.target.vy||state.target.wz?"DRIVING":"READY"):state.mode==Mode::Health?"MEASURING":state.mode==Mode::Follow?"TRACKING":state.mode==Mode::Gesture?(state.target.wz?"TURNING":"READY"):"IDLE");
+    cJSON_AddStringToObject(robot,"state",state.estop?"ESTOP":state.fault?"FAULT":state.mode==Mode::Manual||state.mode==Mode::Watch?(state.target.vx||state.target.vy||state.target.wz?"DRIVING":"READY"):state.mode==Mode::Health?"MEASURING":state.mode==Mode::Follow?"TRACKING":state.mode==Mode::Gesture?(state.target.wz?"TURNING":"READY"):"IDLE");
     cJSON_AddBoolToObject(robot,"estop",state.estop);
     cJSON_AddBoolToObject(robot,"motion_output_installed",driveReady.load());
     cJSON_AddBoolToObject(robot,"calibration_ready",calibrationReady);
     cJSON_AddBoolToObject(robot,"control_allowed",state.owner==0 || state.owner==c.id);
     cJSON_AddNumberToObject(robot,"vx",state.target.vx); cJSON_AddNumberToObject(robot,"vy",state.target.vy); cJSON_AddNumberToObject(robot,"wz",state.target.wz);
+    // The wearable is a motion source only in the dedicated WATCH_CONTROL mode.
+    const auto watch=watchLinkSnapshot();
+    const bool watchOnline=watch.online(static_cast<uint32_t>(now));
+    const auto& wp=watch.packet;
+    auto* wearable=cJSON_AddObjectToObject(j,"watch");
+    cJSON_AddBoolToObject(wearable,"online",watchOnline);
+    cJSON_AddBoolToObject(wearable,"calibrated",watchOnline&&wp.calibrated);
+    cJSON_AddBoolToObject(wearable,"control_armed",state.watchArmed);
+    cJSON_AddBoolToObject(wearable,"rolling",watchOnline&&wp.rolling);
+    cJSON_AddNumberToObject(wearable,"seq",wp.seq);
+    cJSON_AddNumberToObject(wearable,"age_ms",watch.seen?static_cast<uint32_t>(now-watch.receivedMs):0);
+    cJSON_AddNumberToObject(wearable,"vx",watchOnline?wp.vx:0);
+    cJSON_AddNumberToObject(wearable,"vy",watchOnline?wp.vy:0);
+    cJSON_AddNumberToObject(wearable,"wz",watchOnline?wp.wz:0);
+    cJSON_AddBoolToObject(wearable,"contact",watchOnline&&wp.contact);
+    cJSON_AddBoolToObject(wearable,"hr_valid",watchOnline&&wp.hrValid);
+    cJSON_AddBoolToObject(wearable,"spo2_valid",watchOnline&&wp.spo2Valid);
+    cJSON_AddBoolToObject(wearable,"hr_held",watchOnline&&wp.hrValid&&wp.hrHeld);
+    cJSON_AddBoolToObject(wearable,"spo2_held",watchOnline&&wp.spo2Valid&&wp.spo2Held);
+    if(watchOnline&&wp.hrValid) cJSON_AddNumberToObject(wearable,"hr_bpm",wp.hr);
+    else cJSON_AddNullToObject(wearable,"hr_bpm");
+    if(watchOnline&&wp.spo2Valid) cJSON_AddNumberToObject(wearable,"spo2_pct",wp.spo2);
+    else cJSON_AddNullToObject(wearable,"spo2_pct");
+    cJSON_AddNumberToObject(wearable,"sqi",watchOnline?wp.sqi:0);
     auto* device=cJSON_AddObjectToObject(j,"device");
     cJSON_AddStringToObject(device,"firmware",CAREROVER_BUILD_VERSION); cJSON_AddNumberToObject(device,"stage",CAREROVER_STAGE);
     cJSON_AddStringToObject(device,"backend",CAREROVER_INTEGRATION?"tracking":"test_targets");
@@ -449,10 +489,20 @@ void frontTask(void*) {
   Hcsr04 sensor;
   if(!sensor.begin(frontInstallation)) { failSafe(true,"front_pins_invalid");vTaskDelete(nullptr);return; }
   TickType_t wake=xTaskGetTickCount();uint64_t lastReport=0;
+  bool pausedForCall=false;
   SeatNotificationGate notices;
   for(;;) {
+    const bool callNow=audioGatewayCallActive();
+    if(callNow!=pausedForCall) {
+      pausedForCall=callNow;
+      if(callNow) {
+        sensor.pause();
+        const auto now=wirelessNowMs();
+        portENTER_CRITICAL(&safetyMux);safety.pauseFrontForCall(now);portEXIT_CRITICAL(&safetyMux);
+      } else sensor.resume();
+    }
     double cm=0;bool valid=false;
-    if(sensor.service(micros(),cm,valid)) {
+    if(!pausedForCall&&sensor.service(micros(),cm,valid)) {
       const auto now=wirelessNowMs();
       SafetySnapshot state;
       portENTER_CRITICAL(&safetyMux);safety.frontSample(cm,valid,now);state=safety.snapshot(now);portEXIT_CRITICAL(&safetyMux);
@@ -465,7 +515,7 @@ void frontTask(void*) {
       lastReport=now;const auto state=readSafety(now);float yaw;
       portENTER_CRITICAL(&sourceMux);yaw=sources.imu.yaw;portEXIT_CRITICAL(&sourceMux);
       Serial.printf("{\"type\":\"front_status\",\"valid\":%s,\"distance_cm\":%.1f,\"age_ms\":%llu,\"phase\":\"%s\",\"status\":\"%s\",\"seated\":%s,\"stop_reason\":\"%s\",\"yaw_deg\":%.2f}\n",
-        state.front.valid?"true":"false",state.front.valid?state.front.distanceCm:-1.0,(unsigned long long)state.front.ageMs,phaseName(state.front.phase),state.front.status,state.seated?"true":"false",state.stopReason,yaw);
+        state.front.valid?"true":"false",state.front.valid?state.front.distanceCm:-1.0,(unsigned long long)state.front.ageMs,phaseName(state.front.phase),pausedForCall?"PAUSED_CALL":state.front.status,state.seated?"true":"false",state.stopReason,yaw);
     }
     vTaskDelayUntil(&wake,pdMS_TO_TICKS(1));
   }
@@ -483,7 +533,18 @@ void safetyTask(void*) {
   for(;;) {
     const auto now=wirelessNowMs(); const auto gap=uint32_t(now-last); last=now;
     if(gap>maxSafetyGapMs.load()) maxSafetyGapMs.store(gap);
-    portENTER_CRITICAL(&safetyMux); safety.tick(now); auto state=safety.snapshot(now); portEXIT_CRITICAL(&safetyMux);
+    const uint8_t rawEdges=
+      ((CliffInstalledMask & CliffFrontLeft) && digitalRead(CliffFrontLeftPin)==HIGH ? CliffFrontLeft : 0) |
+      ((CliffInstalledMask & CliffFrontRight) && digitalRead(CliffFrontRightPin)==HIGH ? CliffFrontRight : 0) |
+      ((CliffInstalledMask & CliffRearRight) && digitalRead(CliffRearRightPin)==HIGH ? CliffRearRight : 0) |
+      ((CliffInstalledMask & CliffRearLeft) && digitalRead(CliffRearLeftPin)==HIGH ? CliffRearLeft : 0);
+    const auto watch=watchLinkSnapshot();
+    portENTER_CRITICAL(&safetyMux);
+    safety.cliffSample(rawEdges,now);
+    safety.watchInput(watch.packet.vx,watch.packet.vy,watch.packet.wz,
+      watch.packet.calibrated,watch.seen,watch.packet.seq,watch.receivedMs,now);
+    safety.tick(now); auto state=safety.snapshot(now);
+    portEXIT_CRITICAL(&safetyMux);
     if(driveReady.load()) {
       if(state.estop||state.fault||(!state.target.vx&&!state.target.vy&&!state.target.wz)) drive.stopNow();
       else drive.commandChassis(state.target.vx,state.target.vy,state.target.wz,240);
@@ -524,7 +585,26 @@ void wirelessGesture(const char* label,float score,bool accepted,bool actionElig
   const auto action=gestureActions.update(actionEligible,upper,now);
   if(action==GestureAction::None) return;
   const char* error=nullptr;
-  if(action==GestureAction::StartFollow) {
+  if(action==GestureAction::ToggleCall) {
+    // Call signalling is independent of drive mode. The browser must still
+    // obtain an explicit parent tap before it can access an iPhone microphone.
+    bool requested;
+    uint32_t sequence;
+    portENTER_CRITICAL(&sourceMux);
+    requested=sources.callRequested=!sources.callRequested;
+    sequence=++sources.callSeq;
+    portEXIT_CRITICAL(&sourceMux);
+    Serial.printf("{\"type\":\"call_gesture\",\"requested\":%s,\"sequence\":%u}\n",
+      requested?"true":"false",unsigned(sequence));
+  } else if(action==GestureAction::ToggleWatch) {
+    pendingGestureFollowUntil=0;
+    const auto watch=watchLinkSnapshot();
+    portENTER_CRITICAL(&safetyMux);
+    error=safety.toggleWatch(now,watch.online(static_cast<uint32_t>(now))&&watch.packet.calibrated,watch.packet.seq);
+    portEXIT_CRITICAL(&safetyMux);
+  } else if(action!=GestureAction::Stop && readSafety(now).mode==Mode::Watch) {
+    return; // Other autonomous hand actions cannot seize an active watch session.
+  } else if(action==GestureAction::StartFollow) {
     portENTER_CRITICAL(&safetyMux); error=safety.autonomousFollow(now); portEXIT_CRITICAL(&safetyMux);
     pendingGestureFollowUntil=error&&!strcmp(error,"TARGET_NOT_READY")?now+2000:0;
     pendingGestureStopSequence=readSafety(now).stopSequence;
@@ -566,10 +646,15 @@ void wirelessPpg(uint32_t ir) {
 }
 void wirelessStatus() {
   const auto now=wirelessNowMs(); const auto s=readSafety(now);
-  Serial.printf("{\"type\":\"wireless_status\",\"firmware\":\"%s\",\"stage\":%d,\"ap\":%s,\"backend\":\"%s\",\"mode\":\"%s\",\"estop\":%s,\"fault\":%s,\"vx\":%.3f,\"vy\":%.3f,\"wz\":%.3f,\"last_cmd_ms\":%llu,\"stopped_at_ms\":%llu,\"stop_reason\":\"%s\",\"max_safety_gap_ms\":%u,\"min_heap\":%u,\"min_psram\":%u}\n",
-    CAREROVER_BUILD_VERSION,CAREROVER_STAGE,apOnline.load()?"true":"false",CAREROVER_INTEGRATION?"tracking":"test_targets",s.estop?"ESTOP":s.fault?"FAULT":modeName(s.mode),s.estop?"true":"false",s.fault?"true":"false",s.target.vx,s.target.vy,s.target.wz,(unsigned long long)s.lastCommandMs,(unsigned long long)s.stoppedAtMs,s.stopReason,maxSafetyGapMs.load(),ESP.getMinFreeHeap(),ESP.getMinFreePsram());
+  Serial.printf("{\"type\":\"wireless_status\",\"firmware\":\"%s\",\"stage\":%d,\"ap\":%s,\"backend\":\"%s\",\"mode\":\"%s\",\"estop\":%s,\"fault\":%s,\"vx\":%.3f,\"vy\":%.3f,\"wz\":%.3f,\"cliff_installed_mask\":%u,\"cliff_mask\":%u,\"last_cmd_ms\":%llu,\"stopped_at_ms\":%llu,\"stop_reason\":\"%s\",\"max_safety_gap_ms\":%u,\"min_heap\":%u,\"min_psram\":%u}\n",
+    CAREROVER_BUILD_VERSION,CAREROVER_STAGE,apOnline.load()?"true":"false",CAREROVER_INTEGRATION?"tracking":"test_targets",s.estop?"ESTOP":s.fault?"FAULT":modeName(s.mode),s.estop?"true":"false",s.fault?"true":"false",s.target.vx,s.target.vy,s.target.wz,unsigned(s.cliff.installedMask),unsigned(s.cliff.edgeMask),(unsigned long long)s.lastCommandMs,(unsigned long long)s.stoppedAtMs,s.stopReason,maxSafetyGapMs.load(),ESP.getMinFreeHeap(),ESP.getMinFreePsram());
 }
 void wirelessBegin() {
+  safety.configureCliff(CliffInstalledMask);
+  if(CliffInstalledMask & CliffFrontLeft) pinMode(CliffFrontLeftPin,INPUT_PULLUP);
+  if(CliffInstalledMask & CliffFrontRight) pinMode(CliffFrontRightPin,INPUT_PULLUP);
+  if(CliffInstalledMask & CliffRearRight) pinMode(CliffRearRightPin,INPUT_PULLUP);
+  if(CliffInstalledMask & CliffRearLeft) pinMode(CliffRearLeftPin,INPUT_PULLUP);
   frontInstallation=installedFront();
   if(frontInstallation.control.enabled&&!frontPinsReady(frontInstallation))frontInstallation.control.verified=false;
   safety.configureFront(frontInstallation.control);
@@ -606,6 +691,7 @@ void wirelessBegin() {
   apOnline.store(true); const auto now=wirelessNowMs();
   portENTER_CRITICAL(&safetyMux); safety.network(true,now); portEXIT_CRITICAL(&safetyMux);
   Serial.printf("{\"type\":\"ap_ready\",\"ssid\":\"%s\",\"ip\":\"192.168.4.1\"}\n",ssid);
+  if(!watchLinkBegin()) Serial.println("{\"type\":\"watch_error\",\"code\":\"WATCH_TASK_FAILED\"}");
   if(CAREROVER_STAGE<2) return;
   if(!FFat.begin(false)) { failSafe(true,"ffat_mount_failed"); Serial.println("{\"type\":\"wireless_error\",\"code\":\"FFAT_MOUNT_FAILED_NO_FORMAT\"}"); return; }
   if(!FFat.exists("/index.html")) { failSafe(true,"ffat_payload_missing"); Serial.println("{\"type\":\"wireless_error\",\"code\":\"FFAT_PAYLOAD_MISSING\"}"); return; }
