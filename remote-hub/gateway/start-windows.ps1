@@ -3,7 +3,7 @@ param([switch]$EnableAudio)
 # This opens only a loopback SSH forward; it never changes either network adapter.
 $ErrorActionPreference = 'Stop'
 $sshKey = Join-Path $env:USERPROFILE '.ssh\carerover_remote_v2'
-$server = 'root@221.194.149.100'
+$server = 'root@42.81.93.16'
 $relayPort = 18088
 if (-not (Test-Path -LiteralPath $sshKey)) { throw 'CareRover SSH key not found.' }
 if (Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort $relayPort -State Listen -ErrorAction SilentlyContinue) {
