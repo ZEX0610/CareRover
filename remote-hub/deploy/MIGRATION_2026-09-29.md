@@ -13,7 +13,8 @@
 - 新主机已安装 Node 24.21.0 与 Tailscale 1.102.4；中继使用独立非登录 `carerover` 服务账号运行。部署包 SHA-256 在传输前后核对一致。
 - `relay` 的 19 项测试和 `gateway` 的 2 项测试通过。新主机服务为 `active/enabled`；Tailscale Serve 显示 `tailnet only`。
 - 车旁 Windows 的双网络、主板 HTTP 与 CAM HTTP 连通；网关日志显示 `boardUp`、`relayUp`、`cameraUp`、`audioBoardUp`、`audioRelayUp` 均为 `true`，视频与麦克风帧持续上行。
-- 从 Windows 验证私有 HTTPS 证书与 `/health`、家长认证、控制台及 MJPEG `/stream` 响应。iPhone182 通过原网址已看到远程视频。新主机的实际双向通话听感、远程运动以及长时间稳定性仍待现场验收；不能把帧数或 HTTP 200 当作这些验收的替代。
+- 从 Windows 验证私有 HTTPS 证书与 `/health`、家长认证、控制台及 MJPEG `/stream` 响应。iPhone182 通过原网址已看到远程视频，并在现场确认手机能听到小车麦克风、按住说话时小车扬声器能听到手机；服务器同时观察到双向音频帧。远程手动控制、实际运动以及长时间稳定性仍待专项验收，不能把帧数或 HTTP 200 当作这些验收的替代。
+- 实测期间 CAM 一度从局域网消失，主板 HTTP 与服务器保持正常，网关自动重连后视频恢复；此故障说明 CAM 供电/Wi-Fi/HTTP 稳定性仍需单独观察，不能将瞬时画面恢复视作长稳通过。
 - 迁移不改小车主板、CAM 和手表固件。远程视频需要车旁 Windows 持续开机、两路网络稳定且网关运行。旧云主机不再用于故障回退，除非重新配置其 Tailscale、令牌和网关。
 
 ## 凭据与客户端
