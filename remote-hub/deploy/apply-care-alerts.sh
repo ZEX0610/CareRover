@@ -25,12 +25,27 @@ done
 
 install -d -m 0750 "$backup_dir"
 backup="$backup_dir/relay-before-care-alerts-$(date -u +%Y%m%dT%H%M%SZ).tar"
-tar -cf "$backup" -C "$root" "${files[@]}"
+existing_new=()
+for path in "${new_files[@]}"; do
+  if test -e "$root/$path"; then existing_new+=("$path"); fi
+done
+tar -cf "$backup" -C "$root" "${files[@]}" "${existing_new[@]}"
+rollback() {
+  tar -xf "$backup" -C "$root"
+  chown carerover:carerover "${files[@]/#/$root/}" "${existing_new[@]/#/$root/}"
+  for path in "${new_files[@]}"; do
+    if [[ ! " ${existing_new[*]} " == *" $path "* ]]; then rm -f -- "$root/$path"; fi
+  done
+  systemctl restart "$service" || true
+}
 for path in "${files[@]}" "${new_files[@]}"; do
   install -o carerover -g carerover -m 0644 "$stage/$path" "$root/$path"
 done
-systemctl restart "$service"
-systemctl is-active --quiet "$service"
+if ! systemctl restart "$service" || ! systemctl is-active --quiet "$service"; then
+  rollback
+  echo 'Relay failed to restart; previous version restored' >&2
+  exit 1
+fi
 for attempt in {1..10}; do
   if curl --noproxy '*' -fsS --max-time 3 http://127.0.0.1:8088/health; then
     printf '\nbackup=%s\narchive_sha256=%s\n' "$backup" "$actual_sha256"
@@ -38,5 +53,6 @@ for attempt in {1..10}; do
   fi
   sleep 1
 done
-echo "Relay unhealthy after restart; restore from $backup before retrying" >&2
+rollback
+echo "Relay unhealthy after restart; previous version restored from $backup" >&2
 exit 1

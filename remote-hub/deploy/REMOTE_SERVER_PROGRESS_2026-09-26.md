@@ -201,3 +201,9 @@
 - Windows Chrome 经代理访问私有 `tail86bfa5.ts.net` 报 `ERR_CONNECTION_CLOSED`；同机不经代理的 `curl` 访问 `https://carerover-relay.tail86bfa5.ts.net/health` 为 HTTP 200、TLS 验证通过。局域网页无视频是另一问题：CAM `/stream` 曾返回 `503 Video viewer busy`，其单观看连接被持久在线 Windows 网关占用；车旁电脑宜在同一 Tailscale 网络中使用无代理浏览器打开私有远程控制台，不能把代理错误归咎于 CAM。
 - 新版 relay 在家长 `/audio` 连接/断开时发送 `call_state`，通话持续每秒续租；Windows gateway 严格校验并转发到主板音频 WebSocket。中继 15/15、网关 2/2 测试 PASS。部署前服务器旧 `server.mjs` 已备份于 `/opt/carerover/backups/relay-server-before-callpause-20260929.mjs`；新文件 SHA-256 `CE720218029EEFE3DB4373029A31F434528B8A6FB92757F38EEE26E3D97F9925`，服务重启后回环健康检查 200。Windows 网关进程按原音频启动脚本重新加载。
 - 主板应用更新及完整 Flash 备份详见 `main-web/docs/windows-progress.md`。服务器发起 12 秒无音频模拟家长通话，主板串口确认 `PAUSED_CALL`，挂断后恢复普通状态；闭环完成后 `controlDevice=true`、`videoFresh=true`，私有 HTTPS `/health` HTTP 200。未进行手机/真实人声的超声噪声对照，不能宣称噪声主观改善已验收。通话时前方超声测距停用，其他安全约束仍生效。
+
+## 2026-09-29 家长事件通知：源码已同步，服务器未部署
+
+- 源码已加入远程顶部风格化提醒、30 秒无新鲜人脸告警/恢复、基于有效前方超声的离座/入座通知，以及独立 CALL 请求/取消、通话连接/结束事件。`/events` WebSocket 向原生 iPhone 客户端提供结构化事件；字段、确认动作与铃声建议见 `docs/IOS_CLIENT_API.md`。仅有网页前台声音；未实现 APNs 后台推送，另一台 Mac 的 Xcode 工程也未在本仓库修改。
+- `remote-hub/relay` 回归 19/19、`main-web` 回归 27/27、孤立 CALL/FIVE C++ 测试均通过。GitHub `main` 已推送提交 `817afb2`。这些是代码与单元测试结果，不代表现场来电或离座提醒已验收。
+- 私有 Tailscale HTTPS `/health` 从 Windows 仍返回 HTTP 200，网站在线；但目前服务器 SSH 公钥在签名阶段被拒绝，SSH 服务仅允许 `publickey`，不能用密码方式替代。用户暂不能登录云控制台，因此新中继代码和远程网页**尚未部署**。`deploy/apply-care-alerts.sh` 提供哈希校验、旧文件备份、重启健康检查及故障回滚，待恢复服务器访问后再执行。

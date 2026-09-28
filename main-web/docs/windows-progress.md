@@ -303,3 +303,10 @@
 - COM6 只读确认原主板 ESP32-S3 rev0.2、MAC `68:ee:8f:60:68:24`、16 MB Flash。更新前整片备份 `build/backups/main-before-call-sonar-pause-20260929-full.bin` 为 16,777,216 B，SHA-256 `F4EA04B6780F658F4484834A4FCC63BD202CB6451BE39E229A6A90C466CF64AB`。仅写 app0 @`0x10000`，esptool `Hash of data verified`；CAM、FFat、NVS、bootloader、分区表和手表均未写。复位后串口 `IDLE`、`estop=false`、`fault=false`、`ap=true`。
 - 服务器旧 `server.mjs` 已备份至 `/opt/carerover/backups/relay-server-before-callpause-20260929.mjs`；仅部署本次差异，服务器新文件 SHA-256 `CE720218029EEFE3DB4373029A31F434528B8A6FB92757F38EEE26E3D97F9925`。服务重启后回环 `/health` HTTP 200。Windows 音频网关重新加载，Tailscale HTTPS `/health` 直连 HTTP 200、证书验证通过；车端 `controlDevice=true`、`videoFresh=true`。
 - 12 秒无声音/运动的授权家长音频连接现场测试：主板串口从 `front_status=UNKNOWN` 变为 `PAUSED_CALL`，挂断后返回 `UNKNOWN`（45 秒内共收到 227 条前方状态）；远程视频/控制仍在线，`audioPaired=false` 为挂断后的预期值。此测试确认状态传输与固件暂停/恢复路径，不等同于示波器证明 TRIG 物理脉冲数；本轮未做真实人声噪声 A/B 或车轮落地运动验收。当前超声回波始终无效，原始 `UNKNOWN` 还需按硬件接线/摆位单独排查。
+
+## 2026-09-29 离座提醒网页与心率血氧复核
+
+- 用户授权在 IDLE、四轮架空、舵机 5 V 断开、无通话及主板 USB 稳定的条件下更新。COM6 只读识别为原主板 ESP32-S3、16 MB Flash、MAC `68:ee:8f:60:68:24`。更新前整片 Flash 备份 `build/backups/main-before-care-alerts-20260929-full.bin` 为 16,777,216 B，SHA-256 `AED5B63860DE741E152DEDB7584F0EEE35430A9FDAAF6FE7AE6EE1120E475655`，含设备配置与密钥，仅保存在忽略目录，不得上传。
+- 新局域网页 FFat 镜像 `build/care-alerts-20260929/ffat.bin` 为 10,354,688 B，SHA-256 `A0AD5B4C752E1A07682608205EF022199A77EB6ABC91E698555567D8EF4A2823`；**只写** FFat @`0x610000`，esptool 报 `Hash of data verified`，未写主板应用、CAM、NVS、分区表或手表。Windows WLAN 重连 `CareRover-EE68` 后 IP 为 `192.168.4.3/24`；实机首页 302→200，网页版本 `b2df6d7fcd6e8315`，`/js/care-events.js` 与 `/js/care-banners.js` 均 HTTP 200。浏览器视觉/弹窗验收尚未进行。
+- 本轮尝试完整编译主板应用两次均卡在 Arduino 库检测，已中断；**没有新的应用镜像，更没有烧录手势固件改动**。CALL/FIVE 连续手势锁存的源代码与孤立 C++ 测试已入库；须待完整构建和备份比对后另行烧录、实测。
+- 心率血氧诊断：手指未贴传感器时串口为 `finger_present=false`，贴住发光/感光面约 15 秒后为 `finger_present=true`，红光/红外原始值升高且算出心率、SpO₂。用户确认主板 OLED 的**数值与波形都有**。本轮无需为此更改传感器固件；演示数据不可用于医疗判断。
