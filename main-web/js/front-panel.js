@@ -34,7 +34,6 @@ export function createFrontPanel({ state, tr, stale }) {
   return () => {
     const f=state.front, view=frontView(f,Date.now(),stale());
     const label=key=>labels[key]?tr(...labels[key]):key;
-    const mode=state.robot?.mode;
     el('frontTitle').textContent=tr('前方距离','Front distance');
     el('frontDistance').textContent=view.distance;
     // Both displays use the same freshness decision; never retain a stale range.
@@ -43,16 +42,11 @@ export function createFrontPanel({ state, tr, stale }) {
     el('controlFrontNote').hidden=view.valid;
     el('controlFrontNote').textContent=view.valid?'':label(view.status);
 
-    if(mode==='IDLE') {
-      el('frontStatus').textContent=f?.seated?tr('已入座','Seated'):tr('已离座','Vacant');
-      el('frontStatus').dataset.tone='normal';
-    } else {
-      const blocked=['BLOCKED','BYPASS','STOPPED'].includes(view.status);
-      el('frontStatus').textContent=tr(blocked?'有障碍物':'无障碍物', blocked?'Obstacle detected':'Clear');
-      el('frontStatus').dataset.tone=blocked?'warn':'normal';
-    }
+    const blocked=['BLOCKED','BYPASS','STOPPED'].includes(view.status);
+    el('frontStatus').textContent=view.valid?tr(blocked?'有障碍物':'无障碍物', blocked?'Obstacle detected':'Clear'):label(view.status);
+    el('frontStatus').dataset.tone=!view.valid?'muted':blocked?'warn':'normal';
     el('frontPhase').textContent=tr('绕障阶段：','Bypass: ')+label(f?.phase??'NONE');
     el('frontReason').textContent=f?.stop_reason?tr('停车记录：','Last stop: ')+label(f.stop_reason):'';
-    el('frontHint').textContent=tr('手动模式遇障自动向右横移；待机模式检测入座/离座。','Manual: auto right-bypass on obstacle. Idle: seated/vacant detection.');
+    el('frontHint').textContent=tr('手动模式遇障自动向右横移；超声仅用于前方测距与避障。','Manual: auto right-bypass on obstacle. Ultrasonic is for front ranging and obstacle safety only.');
   };
 }

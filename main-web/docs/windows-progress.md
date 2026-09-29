@@ -310,3 +310,11 @@
 - 新局域网页 FFat 镜像 `build/care-alerts-20260929/ffat.bin` 为 10,354,688 B，SHA-256 `A0AD5B4C752E1A07682608205EF022199A77EB6ABC91E698555567D8EF4A2823`；**只写** FFat @`0x610000`，esptool 报 `Hash of data verified`，未写主板应用、CAM、NVS、分区表或手表。Windows WLAN 重连 `CareRover-EE68` 后 IP 为 `192.168.4.3/24`；实机首页 302→200，网页版本 `b2df6d7fcd6e8315`，`/js/care-events.js` 与 `/js/care-banners.js` 均 HTTP 200。浏览器视觉/弹窗验收尚未进行。
 - 本轮尝试完整编译主板应用两次均卡在 Arduino 库检测，已中断；**没有新的应用镜像，更没有烧录手势固件改动**。CALL/FIVE 连续手势锁存的源代码与孤立 C++ 测试已入库；须待完整构建和备份比对后另行烧录、实测。
 - 心率血氧诊断：手指未贴传感器时串口为 `finger_present=false`，贴住发光/感光面约 15 秒后为 `finger_present=true`，红光/红外原始值升高且算出心率、SpO₂。用户确认主板 OLED 的**数值与波形都有**。本轮无需为此更改传感器固件；演示数据不可用于医疗判断。
+
+## 2026-09-29 人脸驱动的离座/入座提示（本轮）
+
+- 按用户新要求，将本地和远程 `seat_left` / `seat_returned` 统一改为：CAM 在线且连续 30 秒有新鲜、非预测的无人脸结果后提示“离座提醒”；此后新鲜人脸再次出现才提示“入座提醒”。CAM 断线和数据过期不计时。原超声 `front.seated` 不再驱动页面入座/离座文案或消息；前方距离显示与避障安全功能保持不变。两条顶部提示与 R5 表面样式一致，约 6.5 秒自动清除；入座事件立即清除仍显示的离座条；快照不重弹旧提示。该逻辑只表明人脸可见性，不能证明儿童真实离座。
+- 离线 Node 验证：局域网页 29/29、远程中继 21/21 PASS，包含超声变化不触发提醒、CAM 断线重置计时、顶部提示自动清除与重连不重弹。`git diff --check` PASS。原生 iPhone Xcode 工程不在本机；`remote-hub/docs/IOS_CLIENT_API.md` 已更新 `seat_left` / `seat_returned`、`display_ms:6500` 契约，App 实际 UI 接入尚未验收。
+- 私有中继增量包 SHA-256 `2B679753E9A8EDFC843E6BAA19BDFF2FA11C1366B7737CD21CCAC09C8E1A9899`，上传后经脚本校验、备份并重启 `carerover-remote-hub.service`；回退包 `/opt/carerover/backups/relay-before-care-alerts-20260929T002522Z.tar`。服务 active，回环 `/health` HTTP 200；主板备份/烧录期间设备链路暂时离线，不将此记为端到端通过。
+- 用户确认 IDLE、四轮架空、舵机 5 V 断开、主板 USB 稳定且无人通话后，只读识别 COM6 为原主板 ESP32-S3 rev0.2、MAC `68:ee:8f:60:68:24`、16 MB Flash。更新前完整备份 `build/backups/main-before-face-seat-20260929-full.bin`（16,777,216 B，SHA-256 `A79DCB7BD991A667281290B7E78C0AC5732C0B8FEA4571C0D7C465D11467BDA2`）仅保留本机忽略目录，分区表与上一完整备份相同，旧应用和 FFat 的哈希与历史镜像一致。
+- 新局域网页版本 `fa93f2cccdb1560a`，FFat 镜像 `build/face-seat-20260929/ffat.bin`（10,354,688 B，SHA-256 `A8D0B45AFEE8275B0F17BA3DE3809751EA292F227F94B436006E89E7CFDB3A56`）。仅写主板 FFat @`0x610000`，esptool 报 `Hash of data verified`；未写主板应用、CAM、NVS、引导或分区表。复位后 `CareRover-EE68` 热点可见且信号 99%，但 Windows WLAN 尚未重新关联，故局域网页与远端视频/事件的用户侧实机验收目前 **NOT RUN**，等待用户重连双网络。

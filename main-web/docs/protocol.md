@@ -55,9 +55,9 @@ Mock 额外上报 `connection.simulated: true`，用于将 WebSocket 模拟设�
 
 ## 家长照护事件（2026-09-29）
 
-局域网页从主板遥测独立计算顶部消息：CAM 在线且连续 30 秒明确未检测到人脸时显示“30 秒未识别到人脸”，仅新鲜、非预测的人脸识别结果可解除；CAM 离线不等于无人脸。前方超声有效、主板 IDLE 且状态稳定约 800 ms 时，另行提示“已离座/已入座”。通话期间超声暂停时不推断离座。局域网页没有操作系统后台通知或 APNs。
+局域网页从主板遥测独立计算顶部消息：CAM 在线且连续 30 秒有新鲜、非预测的“未检测到人脸”结果时，显示“离座提醒”；之后重新获得新鲜、非预测的人脸结果时，显示“入座提醒”。两条顶部消息各约 6.5 秒后自动消失，入座事件也立即清除仍在显示的离座消息。CAM 离线或人脸数据过期不会计入 30 秒；超声测距及其 `front.seated` 不参与离座/入座判断或页面文案，但前方测距与避障保护保留。这里的“离座/入座”是基于人脸可见性的提示，不是身份识别或真实离座证明。局域网页没有操作系统后台通知或 APNs。
 
-服务器把相同状态转换成 `care_state` 快照和 `care_event` 实时事件。家长网页在现有 `/ws` 接收；原生 iPhone App 可独立订阅只读 `/events`，不占用遥控席位。事件 `kind` 包括 `face_absent`、`face_restored`、`seat_left`、`seat_returned`、`call_invite`、`call_cancelled`、`call_connected`、`call_ended`。`call_invite` 包含 `sound:"ring"`、`requires_confirmation:true` 和递增的 `sequence`；家长明确接听后才建立 `/audio`。认证、示例 JSON、快照恢复、前后台限制详见 [iPhone 接口说明](../../remote-hub/docs/IOS_CLIENT_API.md)。
+服务器把相同状态转换成 `care_state` 快照和 `care_event` 实时事件。家长网页在现有 `/ws` 接收；原生 iPhone App 可独立订阅只读 `/events`，不占用遥控席位。当前事件 `kind` 包括 `seat_left`、`seat_returned`、`call_invite`、`call_cancelled`、`call_connected`、`call_ended`；不再产生单独的 `face_absent` / `face_restored`。`seat_left` / `seat_returned` 带 `display_ms:6500` 供 App 顶部提示自动消失；`call_invite` 包含 `sound:"ring"`、`requires_confirmation:true` 和递增的 `sequence`。认证、示例 JSON、快照恢复、前后台限制详见 [iPhone 接口说明](../../remote-hub/docs/IOS_CLIENT_API.md)。
 - `cliff.installed_mask/edge_mask`：四角位依次为左前 `1`、右前 `2`、右后 `4`、左后 `8`；OUT 高表示该角越界。当前安装掩码为 `15`，仅在手动和手表控制中拦截对应平移方向与两种旋转；跟随/自动手势运动仍不得在桌面边缘无保护运行。
 - 健康状态：`NO_FINGER`, `ACQUIRING`, `MEASURING`, `VALID`, `LOW_QUALITY`, `ERROR`。无手指、无效、低质量或过期时不显示为有效 HR / SpO₂。
 - person 500 ms 未更新隐藏；gesture 2 秒未更新失效。两个时间戳各自维护。

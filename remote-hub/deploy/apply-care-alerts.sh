@@ -7,7 +7,7 @@ root=/opt/carerover/remote-hub/relay
 node=/opt/node-v24.21.0-linux-x64/bin/node
 service=carerover-remote-hub.service
 backup_dir=/opt/carerover/backups
-files=(server.mjs public/js/app.js public/js/protocol.js public/css/workspace.css)
+files=(server.mjs public/js/app.js public/js/protocol.js public/js/front-panel.js public/css/workspace.css)
 new_files=(public/js/care-events.js public/js/care-banners.js)
 
 actual_sha256=$(sha256sum "$archive" | cut -d ' ' -f 1)
@@ -19,7 +19,7 @@ stage=$(mktemp -d /tmp/carerover-care-alerts-XXXXXXXX)
 trap 'rm -rf -- "$stage"' EXIT
 tar -xf "$archive" -C "$stage"
 for path in "${files[@]}" "${new_files[@]}"; do test -f "$stage/$path"; done
-for path in server.mjs public/js/app.js public/js/protocol.js public/js/care-events.js public/js/care-banners.js; do
+for path in server.mjs public/js/app.js public/js/protocol.js public/js/front-panel.js public/js/care-events.js public/js/care-banners.js; do
   "$node" --check "$stage/$path"
 done
 

@@ -108,7 +108,9 @@ export function decode(raw) {
       if (!kind || typeof o.event_id !== 'string' || o.event_id.length > 96)
         return { ok: false, error: 'invalid care event' };
       return { ok: true, msg: { type: 'care_event', kind, event_id: o.event_id,
-        active: bool(o.active, false), sequence: num(o.sequence), ts } };
+        active: bool(o.active, false), sequence: num(o.sequence),
+        display_ms: Number.isInteger(o.display_ms) && o.display_ms >= 0 && o.display_ms <= 60_000 ? o.display_ms : undefined,
+        ts } };
     }
     case 'care_state': return { ok: true, msg: { type: 'care_state',
       camera_online: bool(o.camera_online, false), face_alert_active: bool(o.face_alert_active, false),

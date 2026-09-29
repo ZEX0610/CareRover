@@ -1,8 +1,6 @@
 const labels = {
-  face_absent: ['30 秒未识别到人脸', '请查看实时画面确认孩子情况。', 'No face for 30 seconds', 'Check the live video.'],
-  face_restored: ['重新识别到人脸', '无人脸提醒已解除。', 'Face detected again', 'No-face alert cleared.'],
-  seat_left: ['离座提醒', '前方距离变化提示可能离座，请查看画面确认。', 'Possible seat departure', 'The distance changed; check the live video.'],
-  seat_returned: ['入座提醒', '前方距离恢复，提示可能已经入座。', 'Possible seat return', 'The distance returned to its seated range.'],
+  seat_left: ['离座提醒', '已连续 30 秒未识别到人脸，请查看画面确认。', 'Seat absence reminder', 'No face detected for 30 seconds; check the live video.'],
+  seat_returned: ['入座提醒', '重新识别到人脸，请查看画面确认。', 'Face detected again', 'A face is visible again; check the live video.'],
   call_invite: ['孩子请求通话', '请确认是否接听。', 'Incoming call from the child', 'Confirm to answer.'],
   call_cancelled: ['孩子已取消通话', '来电请求已结束。', 'Call request cancelled', 'The incoming call ended.'],
   call_connected: ['通话已接通', '双向音频连接已建立。', 'Call connected', 'Two-way audio is connected.'],
@@ -19,6 +17,7 @@ export class CareBanners {
     this.root.setAttribute('aria-live', 'polite');
     document.body.append(this.root);
     this.active = new Map();
+    this.timers = new Map();
     this.ringTimer = null;
     this.audio = null;
     this.unlock = () => { if (this.ringTimer) this.audio?.resume(); };
@@ -26,19 +25,16 @@ export class CareBanners {
   }
 
   message(kind, active) {
-    if (kind === 'face_restored') this.clear('face_absent');
     if (kind === 'seat_returned') this.clear('seat_left');
     if (kind === 'call_cancelled' || kind === 'call_connected' || kind === 'call_ended') {
       this.clear('call_invite'); this.stopRing();
     }
-    if (kind === 'face_absent' && active === false) { this.clear(kind); return; }
     if (!labels[kind]) return;
-    const sticky = kind === 'face_absent' || kind === 'seat_left' || kind === 'call_invite';
-    if (sticky && this.active.has(kind)) return;
+    if (this.active.has(kind)) return;
     const [zhTitle, zhBody, enTitle, enBody] = labels[kind];
     const english = this.language() === 'en';
     const card = document.createElement('article');
-    card.className = `care-banner care-banner--${kind.startsWith('call') ? 'call' : kind.startsWith('face') ? 'face' : 'seat'}`;
+    card.className = `care-banner care-banner--${kind.startsWith('call') ? 'call' : 'seat'}`;
     const words = document.createElement('div'); words.className = 'care-banner__words';
     const title = document.createElement('strong'); title.textContent = english ? enTitle : zhTitle;
     const body = document.createElement('span'); body.textContent = english ? enBody : zhBody;
@@ -50,20 +46,21 @@ export class CareBanners {
       card.append(button); this.startRing();
     }
     this.root.prepend(card);
-    if (sticky) this.active.set(kind, card);
-    else setTimeout(() => card.remove(), 6500);
+    this.active.set(kind, card);
+    if (kind !== 'call_invite') this.timers.set(kind, setTimeout(() => this.clear(kind), 6500));
   }
 
   snapshot(state) {
-    if (state?.face_alert_active) this.message('face_absent', true);
-    else this.clear('face_absent');
-    if (state?.seat === 'vacant') this.message('seat_left', true);
-    else this.clear('seat_left');
+    // Snapshots restore only actionable calls, never replay an expired seat toast.
     if (state?.call_requested && !state.audio_paired) this.message('call_invite', true);
     else { this.clear('call_invite'); this.stopRing(); }
   }
 
-  clear(kind) { this.active.get(kind)?.remove(); this.active.delete(kind); }
+  clear(kind) {
+    if (this.timers.has(kind)) clearTimeout(this.timers.get(kind));
+    this.timers.delete(kind);
+    this.active.get(kind)?.remove(); this.active.delete(kind);
+  }
 
   startRing() {
     if (this.ringTimer) return;
@@ -92,5 +89,5 @@ export class CareBanners {
     this.audio?.close(); this.audio = null;
   }
 
-  destroy() { this.stopRing(); document.removeEventListener('pointerdown', this.unlock); this.root.remove(); }
+  destroy() { this.stopRing(); for (const kind of this.active.keys()) this.clear(kind); document.removeEventListener('pointerdown', this.unlock); this.root.remove(); }
 }

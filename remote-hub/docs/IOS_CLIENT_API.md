@@ -41,17 +41,16 @@
 
 ```json
 {"type":"care_state","camera_online":true,"face_alert_active":false,"seat":"seated","call_requested":false,"call_sequence":4,"audio_paired":false,"updated_at":"2026-09-29T08:00:00.000Z"}
-{"type":"care_event","event_id":"1790668800000-5","occurred_at":"2026-09-29T08:00:00.000Z","kind":"face_absent","active":true,"title":"30 秒未识别到人脸","body":"请查看实时画面确认孩子情况。","sound":"none","requires_confirmation":false,"source":"carerover-relay"}
-{"type":"care_event","event_id":"1790668810000-6","occurred_at":"2026-09-29T08:00:10.000Z","kind":"face_restored","active":false,"title":"重新识别到人脸","body":"无人脸提醒已解除。","sound":"none","requires_confirmation":false,"source":"carerover-relay"}
-{"type":"care_event","event_id":"1790668820000-7","occurred_at":"2026-09-29T08:00:20.000Z","kind":"seat_left","active":true,"title":"离座提醒","body":"前方距离变化提示可能离座，请查看画面确认。","sound":"none","requires_confirmation":false,"source":"carerover-relay"}
+{"type":"care_event","event_id":"1790668800000-5","occurred_at":"2026-09-29T08:00:00.000Z","kind":"seat_left","active":true,"title":"离座提醒","body":"已连续 30 秒未识别到人脸，请查看画面确认。","sound":"none","display_ms":6500,"requires_confirmation":false,"source":"carerover-relay"}
+{"type":"care_event","event_id":"1790668810000-6","occurred_at":"2026-09-29T08:00:10.000Z","kind":"seat_returned","active":false,"title":"入座提醒","body":"重新识别到人脸，请查看画面确认。","sound":"none","display_ms":6500,"requires_confirmation":false,"source":"carerover-relay"}
 {"type":"care_event","event_id":"1790668830000-8","occurred_at":"2026-09-29T08:00:30.000Z","kind":"call_invite","active":true,"sequence":5,"title":"孩子请求通话","body":"请确认是否接听。","sound":"ring","requires_confirmation":true,"source":"carerover-relay"}
 ```
 
-`kind` 完整集合：`face_absent` / `face_restored`、`seat_left` / `seat_returned`、`call_invite` / `call_cancelled`、`call_connected` / `call_ended`。App 用 `event_id` 去重；用 `kind` 和 `active` 驱动顶部条，不依赖可翻译的 `title` 做判断。`face_absent` 顶部条保持到 `face_restored`；`seat_left` 顶部条保持到 `seat_returned`，入座消息短暂显示；`call_invite` 顶部条带“接听”按钮并循环播放本机铃声，直到用户点接听、收到 `call_cancelled` 或 `call_connected`。点“接听”后按第 5 节建立 `/audio`；`call_connected` 只表示两端音频 WebSocket 已配对，不等于麦克风权限或音质已通过。`call_cancelled` 表示再次有效的 CALL 手势取消请求；`call_ended` 表示一端音频断开，两者不能混淆。
+`kind` 当前完整集合：`seat_left` / `seat_returned`、`call_invite` / `call_cancelled`、`call_connected` / `call_ended`。不再发送独立的 `face_absent` / `face_restored`。App 用 `event_id` 去重；用 `kind` 和 `active` 驱动顶部条，不依赖可翻译的 `title` 做判断。收到 `seat_left` 时显示“离座提醒”，`display_ms` 毫秒后自动清除；收到 `seat_returned` 时立即清除残留的离座条、显示“入座提醒”，同样自动清除。不要依据 `care_state.seat` 重弹已超时的提示。`call_invite` 顶部条带“接听”按钮并循环播放本机铃声，直到用户点接听、收到 `call_cancelled` 或 `call_connected`。点“接听”后按第 5 节建立 `/audio`；`call_connected` 只表示两端音频 WebSocket 已配对，不等于麦克风权限或音质已通过。`call_cancelled` 表示再次有效的 CALL 手势取消请求；`call_ended` 表示一端音频断开，两者不能混淆。
 
 CALL 和 FIVE 都必须先被稳定识别，然后手势离开/不再分类为该手势，再次稳定识别才会触发第二次；持续保持或同一手势短暂低置信度不会连发。CALL 第一次为请求，第二次为取消；FIVE 第一次进入手表模式，第二次退出。每个 CALL 请求有递增 `sequence`；同一序号的遥测重发不能重复响铃。
 
-无人脸提醒的含义只是“CAM 在线并持续 30 秒未检测到新的人脸”，**不是儿童身份识别或离座证明**。CAM 离线时不启动 30 秒计时，也不会假称重新识别；已产生的提醒保留到真实人脸再次出现。离座/入座来自 IDLE 时有效的前方超声测距，稳定约 800 ms 后上报；通话期间超声暂停时不产生新离座判断。App 应将两种提醒分开展示。`care_state.seat="unknown"` 表示尚无可靠基线。
+“离座提醒”的依据只是 CAM 在线且连续 30 秒得到新鲜、非预测的未识别到人脸结果，**不是儿童身份识别或真实离座证明**。CAM 离线或数据过期不会累计该时长，也不会假称重新识别；随后新鲜人脸出现才发送“入座提醒”。超声测距、主板模式以及 `front.seated` 不参与这两种事件。`care_state.seat="unknown"` 表示尚无可靠人脸基线；`vacant` 只表示已触发无人脸提醒，不代表已证实离座。
 
 这个接口是**已连接 App 的实时事件流**，不是 APNs。App 在后台、被系统挂起、断网或未启动时，服务器目前不能保证弹窗或铃声；若要离线推送，需要另行建设 APNs 设备令牌、推送凭据、队列及隐私/权限流程。重连时用 `care_state` 恢复当前持续状态，不把它误当新的离座事件；若 `call_requested=true` 且 `audio_paired=false`，可恢复未接来电提示。Xcode 项目在另一台 Mac，仓库未包含 App 源码，故 App 的界面、本机铃声和通知权限仍须由 App 开发者接入验收。
 
